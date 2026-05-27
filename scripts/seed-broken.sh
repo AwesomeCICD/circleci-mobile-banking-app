@@ -15,9 +15,10 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TARGET="$REPO_ROOT/miniapps/payments/src/App.js"
+APP="$REPO_ROOT/miniapps/payments/src/App.js"
+TEST="$REPO_ROOT/miniapps/payments/__tests__/App.test.js"
 
-cat > "$TARGET" <<'EOF'
+cat > "$APP" <<'EOF'
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
@@ -37,6 +38,19 @@ const styles = StyleSheet.create({
 export default App;
 EOF
 
-echo "Seeded broken state in $TARGET"
+cat > "$TEST" <<'EOF'
+import React from 'react';
+import { render } from '@testing-library/react-native';
+import App from '../src/App';
+
+test('renders Payments title', () => {
+  const { getByText } = render(<App />);
+  expect(getByText('Payments')).toBeTruthy();
+});
+EOF
+
+echo "Seeded broken state in:"
+echo "  $APP"
+echo "  $TEST"
 echo ""
 echo "Run 'chunk validate' (or just let the Stop hook fire) to see both gates fail."
