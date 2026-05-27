@@ -1,0 +1,76 @@
+{
+  "commands": [
+    {
+      "name": "install-payments",
+      "run": "cd miniapps/payments && npm ci"
+    },
+    {
+      "name": "install-transfers",
+      "run": "cd miniapps/transfers && npm ci"
+    },
+    {
+      "name": "lint-payments",
+      "run": "cd miniapps/payments && npm run lint",
+      "role": "gate",
+      "timeout": 60,
+      "limit": 3
+    },
+    {
+      "name": "lint-transfers",
+      "run": "cd miniapps/transfers && npm run lint",
+      "role": "gate",
+      "timeout": 60,
+      "limit": 3
+    },
+    {
+      "name": "test-payments",
+      "run": "cd miniapps/payments && npm test -- --watchAll=false",
+      "role": "gate",
+      "timeout": 120,
+      "limit": 3
+    },
+    {
+      "name": "test-transfers",
+      "run": "cd miniapps/transfers && npm test -- --watchAll=false",
+      "role": "gate",
+      "timeout": 120,
+      "limit": 3
+    },
+    {
+      "name": "bundle-payments",
+      "run": "cd miniapps/payments && mkdir -p dist/ios/assets && npm run bundle:ios",
+      "role": "gate",
+      "timeout": 300,
+      "limit": 3
+    },
+    {
+      "name": "bundle-transfers",
+      "run": "cd miniapps/transfers && mkdir -p dist/ios/assets && npm run bundle:ios",
+      "role": "gate",
+      "timeout": 300,
+      "limit": 3
+    }
+  ],
+  "vcs": {
+    "org": "AwesomeCICD",
+    "repo": "circleci-mobile-banking-app"
+  },
+  "validation": {
+    "sidecarImage": "b92405ec-8be4-4211-ac7f-5d97fdbdf3b1"
+  },
+  "environment": {
+    "stack": "ruby",
+    "setup": [
+      {
+        "name": "install",
+        "command": "bundle install"
+      },
+      {
+        "name": "test",
+        "command": "bundle exec rspec"
+      }
+    ],
+    "image": "cimg/ruby",
+    "image_version": "4.0.2"
+  }
+}

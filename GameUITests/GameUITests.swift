@@ -1,0 +1,45 @@
+//
+//  GameUITests.swift
+//  GameUITests
+//
+//  Created by Marc O'Morain on 12/11/2015.
+//  Copyright © 2015 CircleCI. All rights reserved.
+//
+
+import XCTest
+
+class GameUITests: XCTestCase {
+        
+    override func setUp() {
+        super.setUp()
+        
+        // Put setup code here. This method is called before the invocation of each test method in the class.
+        
+        // In UI tests it is usually best to stop immediately when a failure occurs.
+        continueAfterFailure = false
+        // UI tests must launch the application that they test. Doing this in setup will make sure it happens for each test method.
+        let app = XCUIApplication()
+        setupSnapshot(app)
+        app.launch()
+
+        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
+    }
+    
+    override func tearDown() {
+        // Put teardown code here. This method is called after the invocation of each test method in the class.
+        super.tearDown()
+    }
+    
+    func testBankingShellLoads() {
+        snapshot("0_Launch")
+        let app = XCUIApplication()
+
+        XCTAssertTrue(app.staticTexts["CircleCI Banking"].exists)
+        XCTAssertTrue(app.staticTexts["Payments"].exists)
+        XCTAssertTrue(app.staticTexts["Transfers"].exists)
+        XCTAssertTrue(app.staticTexts["● All modules loaded"].exists)
+
+        snapshot("1_ModulesLoaded")
+    }
+    
+}
