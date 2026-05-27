@@ -2,9 +2,11 @@
 
 [![CircleCI](https://circleci.com/gh/AwesomeCICD/circleci-mobile-banking-app/tree/main.svg?style=svg)](https://circleci.com/gh/AwesomeCICD/circleci-mobile-banking-app/tree/main)
 
-A CircleCI demo of a brownfield mobile banking app — React Native mini-apps bundling on Linux, handing off to a native iOS shell building on macOS, through security scanning to TestFlight and App Store submission.
+A CircleCI demo of a brownfield mobile banking app — React Native mini-apps bundling on Linux, handing off to a native iOS shell on macOS.
 
 Built to showcase **Chunk Sidecars**: moving CI validation into the inner loop so feedback lands in seconds, before any commit hits CI.
+
+The 4-minute on-stage walkthrough lives in [`DEMO.md`](./DEMO.md).
 
 ---
 
@@ -14,45 +16,31 @@ Built to showcase **Chunk Sidecars**: moving CI validation into the inner loop s
 
 **The fix:** Chunk Sidecars run the same checks CI runs — locally, automatically, in under a minute, before any push.
 
-**The result:** When the sidecar says green, CI agrees. First time, every time.
-
-The on-stage walkthrough lives in [`DEMO.md`](./DEMO.md).
+**The result:** When the sidecar says green, CI agrees. First push, first pass.
 
 ---
 
 ## Architecture
 
 ```
-[Build RN: Payments] ─┐
-                       ├─ [upload-artifacts] ─ [validate] ─ [build-native-shell] ─ [security-scans] ─ [deploy-testflight] ─ [approve-release] ─ [submit-app-store]
-[Build RN: Transfers] ─┘
-```
-
-### Stage 1 — React Native Mini-Apps (Linux, parallel)
-
-Two minimal React Native projects under `miniapps/`:
-
-```
 miniapps/
-├── payments/    — Payments mini-app
-└── transfers/   — Transfers mini-app
+├── payments/    — Payments mini-app (React Native)
+└── transfers/   — Transfers mini-app (React Native)
+
+Game/            — Native UIKit iOS shell that hosts the mini-app bundles
+.chunk/          — Chunk Sidecar configuration (gates the inner loop)
+.circleci/       — Minimal CI pipeline that mirrors the sidecar gates
+.claude/         — Claude Code Stop hook that auto-runs `chunk validate`
+scripts/         — seed-broken.sh / reset-clean.sh for demo runs
 ```
 
-Each runs `npm install`, ESLint, Jest, and `react-native bundle` to produce a real iOS `.jsbundle`.
-
-### Stage 2 — Native iOS Shell (macOS)
-
-The native shell is a UIKit app (`Game/GameViewController.swift`) that reads `bundle_manifest.json` from the main bundle at launch and displays which React Native mini-app modules were assembled into the build — build number, branch, module name, platform, bundle size.
-
-### Stage 3 — Security & Distribution
-
-Snyk dependency scan, simulated SonarQube analysis, Fastlane to TestFlight, QR code distribution to Slack, manual approval gate, then App Store submission.
+The native shell (`Game/GameViewController.swift`) reads `bundle_manifest.json` at launch and renders which RN miniapps were assembled into the build — build number, branch, module name, platform, bundle size. The shell builds on macOS via Xcode/Fastlane (not included in the minimal demo pipeline; see "Going further" below).
 
 ---
 
-## Chunk Sidecar configuration
+## Chunk Sidecar gates
 
-The sidecar config lives in [`.chunk/config.json`](./.chunk/config.json). Gates run in order:
+Defined in [`.chunk/config.json`](./.chunk/config.json). Same order for the sidecar and the CI pipeline — that's the point.
 
 | Stage | Commands | Why |
 |---|---|---|
@@ -78,42 +66,37 @@ cd circleci-mobile-banking-app
 (cd miniapps/payments && npm ci)
 (cd miniapps/transfers && npm ci)
 
-# 3. Seed the "broken" demo state
-./scripts/seed-broken.sh
+# 3. Provision your own Chunk sidecar (one-time, ~30s)
+chunk sidecar create --org-id <YOUR_ORG_ID> --name circleci-mobile-banking-app
 
-# 4. Open Claude Code and run the demo
+# 4. Warm the sidecar
+chunk validate                       # expect green in ~15s
+
+# 5. Open Claude Code in this repo (so the Stop hook activates)
 #    See DEMO.md for the on-stage walkthrough.
 
-# 5. Reset to clean baseline when done
+# 6. Apply the broken state when you're ready to demo
+./scripts/seed-broken.sh
+
+# 7. Reset to clean baseline between runs
 ./scripts/reset-clean.sh
 ```
 
-To run the demo with your own Chunk sidecar, see [`DEMO.md`](./DEMO.md) for the full setup.
+### Building your own variant
+
+To adapt this demo for a different feature / bug class / stack:
+
+1. Edit `scripts/seed-broken.sh` to apply your own deterministic broken state.
+2. Edit `.chunk/config.json` if you want different gates (e.g. add typecheck, swap lint rules, add coverage).
+3. Mirror those changes in `.circleci/config.yml` so sidecar and CI stay in lockstep.
+4. Update `DEMO.md` so the runbook still matches.
+
+Keep `main` green so any teammate can clone and run.
 
 ---
 
-## Orbs
+## Going further
 
-| Orb | Version | Purpose |
-|---|---|---|
-| `circleci/aws-cli` | 5.4.0 | OIDC-based AWS authentication |
-| `circleci/aws-s3` | 4.1.1 | S3 artifact upload/copy |
-| `circleci/slack` | 4.14.0 | Slack notifications |
-| `snyk/snyk` | 2.3.0 | Dependency vulnerability scanning |
-| `tadashi0713/app-distribution` | 1.2.0 | QR code generation and Slack distribution |
+The active `.circleci/config.yml` is a **minimal demo pipeline** — install / lint / test / bundle only, no external secrets needed. That keeps stage-day deterministic.
 
----
-
-## Environment Variables
-
-| Variable | Purpose |
-|---|---|
-| `AWS_ROLE_ARN` | IAM role ARN for OIDC assumption |
-| `AWS_REGION` | AWS region |
-| `S3_BUCKET_NAME` | Artifact storage bucket |
-| `SNYK_TOKEN` | Snyk API token |
-| `CIRCLE_TOKEN` | CircleCI API token (for QR code generation) |
-| `SLACK_ACCESS_TOKEN` | Slack bot token |
-| `SLACK_DEFAULT_CHANNEL` | Default Slack channel |
-
-Apple and Fastlane credentials are stored in 1Password.
+For a fuller mobile pipeline reference (macOS native build, Snyk dependency scan via OIDC, Fastlane to TestFlight, manual approval, App Store submission), see [`AwesomeCICD/circleci-demo-ios:bcp-demo`](https://github.com/AwesomeCICD/circleci-demo-ios/tree/bcp-demo) — same architecture, full pipeline, all the orbs and contexts.
