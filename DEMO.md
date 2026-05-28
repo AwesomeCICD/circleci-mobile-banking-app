@@ -1,10 +1,9 @@
-# Demo Script: Chunk Sidecars
-
-A 4-minute live demo. Two shell command sequences and three messages to Claude.
+# Chunk Sidecars — Live Demo Script
+### LeadDev LDX3 London · 4 minutes
 
 ---
 
-## Pre-flight (backstage, before the talk)
+## PRE-FLIGHT (run backstage before the talk)
 
 ```bash
 cd ~/projects/mobile/circleci-mobile-banking-app    # the demo repo
@@ -15,119 +14,122 @@ chunk validate                                      # warm it (green in ~13s)
 claude                                              # launch Claude Code from inside the repo (so the Stop hook activates)
 ```
 
-**Have open:**
-- Editor with `miniapps/payments/src/App.js` (left of the screen)
-- Claude Code terminal (right of the screen)
+**Have open before you go on stage:**
+- Editor with `miniapps/payments/src/App.js` visible (left half of screen)
+- Claude Code terminal (right half of screen)
 - Browser tab pre-loaded to your CircleCI pipeline page
 
+> ⚠️ Do not run `chunk validate` again after seeding — the first failure needs to happen live.
+
 ---
 
-## Beat 1 — Frame the problem  *(0:00 → 0:30)*
+## INTRO (0:00 → 0:30)
 
-**Say:**
+> **[Face the audience. No commands yet.]**
 
-> AI agents push fast, and what they push is often broken. CI catches it eventually — but eventually costs money and time. What if validation ran *before* the agent's commit ever left the laptop?
->
-> That's what Chunk Sidecars do. A sidecar is a remote sandbox that runs the same commands your CI runs — install, lint, test, build — while you're still coding.
+AI coding agents are fast. Really fast. Claude Code, Cursor, Copilot — they ship code at a pace no developer could match manually.
 
-**Optional, to make the sidecar visible up front:**
+But fast doesn't mean correct.
 
-```bash
-chunk sidecar current        # name + id of the active sidecar
-chunk validate --list        # the 8 gates the sidecar will run
+The problem isn't that agents write bad code. The problem is that by the time CI tells you something is broken — the agent has moved on. The context is gone. You're debugging a commit you've already forgotten.
+
+What if validation happened *before* the commit? Before the push. Before CI even sees it.
+
+That's what Chunk Sidecars do. And I'm going to show you exactly how it works.
+
+---
+
+## WHAT IS A SIDECAR? (0:30 → 1:00)
+
+> **[Optional: switch to terminal, run `chunk sidecar current` and `chunk validate --list`]**
+
+A sidecar is a remote sandbox — running on CircleCI — that mirrors your CI environment exactly. Same install commands. Same lint rules. Same test suite.
+
+It lives next to your editor, not at the end of a pull request.
+
+> **[Point to the list of gates if visible]**
+
+Here's mine. Eight gates — install, lint, test, build — one for each mini-app in this project. Same eight commands my CircleCI pipeline runs. The difference is *when* they run.
+
+---
+
+## WHAT IS A STOP HOOK? (1:00 → 1:30)
+
+Here's the part that makes this interesting. I'm not going to type `chunk validate` once during this demo.
+
+Claude Code has a feature called a **Stop hook** — a shell command that fires automatically every time the agent finishes a turn. You configure it once, in `.claude/settings.json`. When you run `chunk init` in your repo, it generates that file for you.
+
+It looks like this:
+
+```json
+"hooks": {
+  "Stop": [
+    { "hooks": [{ "type": "command", "command": "chunk validate" }] }
+  ]
+}
 ```
 
----
+That's it. Every time Claude finishes a reply — the sidecar runs. If something fails, that failure is injected back into the conversation. Claude sees it. Claude fixes it. Before anything is pushed.
 
-## Beat 2 — Show the broken file  *(0:30 → 1:00)*
+> **[Pause. Let that land.]**
 
-**Do:** open `miniapps/payments/src/App.js` in your editor. Audience sees:
-
-```javascript
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-
-const App = () => (
-  <View style={styles.container}>
-    <Text style={styles.welcome}>Welcome back</Text>
-    <Text style={styles.title}>Welcome to Payments</Text>
-  </View>
-);
-```
-
-**Say:**
-
-> I asked Claude to make the Payments screen feel more welcoming. Here's what it produced — added a welcome line, updated the title, started importing `TouchableOpacity` for some interactivity it never finished. To a human skimming this, it looks shippable. Let's see what the sidecar thinks.
+Validation in the inner loop. Not as an afterthought. As part of the agent's lifecycle.
 
 ---
 
-## Beat 3 — Message 1: the sanity check  *(1:00 → 1:45)*
+## THE DEMO (1:30 → 3:10)
 
-**Type to Claude:**
+> **[Screen: editor on left showing `miniapps/payments/src/App.js`, Claude Code terminal on right]**
+
+Here's the scenario. I asked Claude to make the Payments screen feel more welcoming. It added a welcome line, updated the title, started importing `TouchableOpacity` for some interactivity it never finished.
+
+To a human skimming the diff — this looks shippable. Let's see what the sidecar thinks.
+
+> **[Switch to Claude Code terminal. Type:]**
 
 ```
 Quick sanity check on the Payments changes before I push?
 ```
 
-> *Avoid prompts like "check for lint errors" or "is there dead code?" — they bias Claude into finding the bug itself instead of letting the sidecar do it.*
-
-**What happens:** Claude reads the file, replies casually, ends its turn. Claude Code then fires its **Stop hook** — a shell command that runs automatically every time the agent finishes a turn. In this repo, `chunk init` configured that hook to run `chunk validate`. About 7 seconds later, validation surfaces:
+> **[Claude replies. Stop hook fires automatically. ~7 seconds later:]**
 
 ```
 ✗ lint-payments
   'TouchableOpacity' is defined but never used  no-unused-vars
 ```
 
-**Say:**
+Seven seconds. Dead import. Same lint rule CI would have caught — just minutes earlier, and zero pipeline spend.
 
-> Seven seconds. The sidecar caught the dead import — same lint rule CI would have run, just minutes earlier.
-
----
-
-## Beat 4 — Message 2: fix the lint  *(1:45 → 2:30)*
-
-Claude proposes removing the unused import.
-
-**Type:**
+> **[Type:]**
 
 ```
 go ahead
 ```
 
-**What happens:** Claude edits the import line. Stop hook fires again, runs `chunk validate`. About 9 seconds later:
+> **[Claude removes the unused import. Stop hook fires again. ~9 seconds later:]**
 
 ```
 ✗ test-payments
   Unable to find an element with text: Payments
 ```
 
-**Say:**
+Lint passes. But the test is still asserting the old title. The sidecar caught the second issue on the next turn — no prompt needed.
 
-> Lint passes now. But the title text changed, and the test still asserts the old copy. Same loop, second iteration.
-
----
-
-## Beat 5 — Message 3: fix the test  *(2:30 → 2:50)*
-
-Claude proposes updating the test assertion to `'Welcome to Payments'`.
-
-**Type:**
+> **[Type:]**
 
 ```
 go ahead
 ```
 
-**What happens:** Test updated. Stop hook fires. All 8 gates green in ~13 seconds.
+> **[Claude updates the test. Stop hook fires. ~13 seconds later, all 8 gates green.]**
 
-**Say:**
-
-> Two fixes. Under a minute total. The agent never touched CI.
+Two fixes. Under a minute. The agent never touched CI.
 
 ---
 
-## Beat 6 — Push and watch CI confirm  *(2:50 → 4:00)*
+## THE PUSH (3:10 → 4:00)
 
-**Type in your terminal:**
+> **[In the terminal, type:]**
 
 ```bash
 git add miniapps/payments/
@@ -135,19 +137,49 @@ git commit -m "feat(payments): add welcome message"
 git push
 ```
 
-**Switch to the CircleCI browser tab.** The `mobile-banking-pipeline` workflow runs Payments + Transfers in parallel, same commands the sidecar just ran.
+> **[Switch to the CircleCI pipeline tab in the browser. Pipeline runs. Goes green.]**
 
-**Say (as it goes green):**
+When the sidecar agrees — CI agrees.
 
-> When the sidecar agrees, CI agrees. First push, first pass. That's what validation in the inner loop buys you.
+First push. First pass. No pipeline failures. No re-runs. No context switching.
+
+> **[Face the audience.]**
+
+That's what validation in the inner loop looks like. Not faster machines. Not more parallelism. Just the right answer, at the right moment — before it costs you anything.
+
+That's Chunk Sidecars.
 
 ---
 
-## Between runs
+## ANTICIPATED QUESTIONS
+
+**"How does it know to run after every turn?"**
+One command — `chunk init` — wires it up. It generates `.claude/settings.json` with the Stop hook pointing at `chunk validate`. You don't write the file by hand.
+
+**"What if the sidecar and CI disagree?"**
+They run the same commands. `.chunk/config.json` and `.circleci/config.yml` are the same gates. We treat them as one contract.
+
+**"Doesn't this slow every Claude turn down?"**
+By about 10–15 seconds on turns that change code, on a warm sidecar. That's CI's job, done in seconds instead of minutes — once per turn, not once per PR.
+
+---
+
+## IF SOMETHING GOES WRONG
+
+| What happened | Do this |
+|---|---|
+| `chunk validate` hangs past 30s | Run `chunk sidecar current` in another pane. If healthy, retry. Otherwise fall back: `cd miniapps/payments && npm run lint && npm test` |
+| Stop hook didn't fire | You launched Claude Code from outside the repo. Quit, `cd` into the repo, run `claude` again |
+| Claude caught the bug in its first reply | Pivot: *"Even better — but what about the test?"* Send message 2 to continue |
+| CI takes longer than 2 minutes | Have a screenshot of a previous green run ready. *"In a previous run, you can see…"* |
+
+---
+
+## RESET BETWEEN RUNS
 
 ```bash
-./scripts/reset-clean.sh                # restore App.js and App.test.js to baseline
-git reset --hard origin/main            # drop any commits you made during practice
+./scripts/reset-clean.sh
+git reset --hard origin/main
 ```
 
 Then re-run pre-flight from the top.
