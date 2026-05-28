@@ -6,12 +6,19 @@ A 4-minute live stage demo. Built for LeadDev LDX3 London (June 2026), reusable 
 
 ## Mental model
 
-The audience watches two things on a split screen:
-
-1. **You having a normal coding conversation with Claude** in Claude Code.
-2. **The Chunk Sidecar's validation output landing in that conversation between turns.**
+The audience watches one main thing: **you having a normal coding conversation with Claude** in Claude Code. The Chunk Sidecar's validation output lands inside that same conversation panel between turns — it's not a separate window, it's just more text appearing in Claude Code.
 
 **You don't type `chunk validate`. You never tell Claude to run it.** The Stop hook does it automatically every time Claude finishes a turn. Your job on stage is just to chat with Claude like you would on any normal day.
+
+### Screen setup
+
+| # | Window | When the audience needs to see it |
+|---|---|---|
+| 1 | Editor (VS Code / Cursor) showing `miniapps/payments/src/App.js` | Beat 2 — "look at what the agent did" |
+| 2 | Claude Code terminal | Beats 3–7 — the conversation + validation output |
+| 3 | Browser tab on CircleCI, pre-navigated to your pipeline page | Beat 8 — green-pipeline finale |
+
+Split your projected display so the editor (left) and Claude Code (right) are side-by-side. ⌘-Tab to the browser tab at Beat 8 — don't navigate from a fresh tab live. Use 18–20pt minimum font on Claude Code; the lint/test error lines need to be readable from the back row.
 
 So:
 
