@@ -1,5 +1,5 @@
 # Chunk Sidecars — Live Demo Script
-### LeadDev LDX3 London · ~5 minutes
+### LeadDev LDX3 London · ~6 minutes
 
 ---
 
@@ -40,7 +40,25 @@ That's what Chunk Sidecars do. And I'm going to show you exactly how it works.
 
 ---
 
-## WHAT IS A SIDECAR? (0:30 → 1:00)
+## WHAT IS THE INNER LOOP? (0:30 → 1:15)
+
+> **[Image on screen: the two-loop diagram — Inner Loop (Plan → Code → Validate → Debug) on the left, Outer Loop (Build → Test → Deploy → Release) on the right, joined by "Change" and "Feedback" arrows.]**
+
+Quick bit of framing. Every change lives in two loops.
+
+The **inner loop** — on the left — is where you actually work: plan, code, validate, debug, on your machine, in seconds. The **outer loop** — on the right — is what happens after you push: build, test, deploy, release, in CI, in minutes.
+
+For years those were balanced. Then AI showed up and made the inner loop incredibly fast — but not any more *correct*. So incomplete changes sail through the inner loop and pile up in the outer loop, where every failure costs a full CI cycle and a context switch.
+
+> **[Point to the "Validate" node on the inner-loop side.]**
+
+The fix isn't a faster outer loop. It's putting real validation back *here* — on the Validate step, inside the inner loop — so a change is correct before it ever becomes CI's problem.
+
+That's the gap sidecars close.
+
+---
+
+## WHAT IS A SIDECAR? (1:15 → 1:45)
 
 > **[Optional: switch to terminal, run `chunk sidecar current` and `chunk validate --list`]**
 
@@ -54,7 +72,7 @@ Here's mine. Twelve gates — install, lint, **scan**, test, build — across bo
 
 ---
 
-## THE CONTRACT — SIDECAR ≡ CI (1:00 → 2:00)
+## THE CONTRACT — SIDECAR ≡ CI (1:45 → 2:45)
 
 > **[Switch to the editor tab with `.chunk/config.json` and `.circleci/config.yml` side by side.]**
 
@@ -82,7 +100,7 @@ This isn't *similar* to CI. It **is** CI's command set, pulled forward to the in
 
 ---
 
-## WHAT IS A STOP HOOK? (2:00 → 2:30)
+## WHAT IS A STOP HOOK? (2:45 → 3:15)
 
 Here's the part that makes this interesting. I'm not going to type `chunk validate` once during this demo.
 
@@ -106,7 +124,7 @@ Validation in the inner loop. Not as an afterthought. As part of the agent's lif
 
 ---
 
-## THE DEMO (2:30 → 4:10)
+## THE DEMO (3:15 → 4:55)
 
 > **[Screen: editor on left showing `miniapps/payments/src/App.js`, Claude Code terminal on right]**
 
@@ -156,7 +174,7 @@ Two fixes. Under a minute. The agent never touched CI. And the scan gates went g
 
 ---
 
-## THE PUSH (4:10 → 5:00)
+## THE PUSH (4:55 → 5:45)
 
 > **[In the terminal, type:]**
 
