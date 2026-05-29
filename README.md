@@ -29,7 +29,7 @@ miniapps/
 
 Game/            — Native UIKit iOS shell that hosts the mini-app bundles
 .chunk/          — Chunk Sidecar configuration (gates the inner loop)
-.circleci/       — Minimal CI pipeline that mirrors the sidecar gates
+.circleci/       — CI pipeline that mirrors the sidecar gates 1:1
 .claude/         — Claude Code Stop hook that auto-runs `chunk validate`
 scripts/         — seed-broken.sh / reset-clean.sh for demo runs
 ```
@@ -141,8 +141,8 @@ Keep `main` green so any teammate can clone and run.
 
 ## Going further
 
-The active `.circleci/config.yml` is a **minimal demo pipeline** — install / lint / test / bundle only, no external secrets needed. That keeps stage-day deterministic. Sidecar gates (including the Trivy + Snyk scans) are richer than CI by design — that's the shift-left story: catch CVEs in the inner loop, not on the PR.
+The active `.circleci/config.yml` mirrors the sidecar gates **1:1** — install / lint / scan / test / bundle, for both mini-apps, in the same order. That's the whole point: when the sidecar says green, CI agrees, and vice versa. The shift-left story is purely about *when* the gates run (inner loop vs. PR), not *which* gates run.
 
-> **Note:** the scan gates run on the sidecar but are **not** yet mirrored in `.circleci/config.yml`. If you want sidecar and CI in full lockstep, add the same trivy / snyk commands to the CI config. We've deliberately left CI minimal here.
+> **Note:** the CI scan steps need `SNYK_TOKEN`, supplied via the AwesomeCICD `snyk` context. Snyk reads the token from the environment, so no `snyk auth` step is needed in CI. Trivy needs no secret. The Trivy vuln DB is cached between runs to keep stage-day fast.
 
 For a fuller mobile pipeline reference (macOS native build, Snyk dependency scan via OIDC at the PR layer, Fastlane to TestFlight, manual approval, App Store submission), see [`AwesomeCICD/circleci-demo-ios:bcp-demo`](https://github.com/AwesomeCICD/circleci-demo-ios/tree/bcp-demo) — same architecture, full pipeline, all the orbs and contexts.

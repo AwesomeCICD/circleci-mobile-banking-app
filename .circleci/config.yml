@@ -1,10 +1,14 @@
 version: 2.1
 
-# Minimal demo pipeline — mirrors the Chunk Sidecar gates so that
-# "sidecar green" reliably means "CI green". No external secrets.
+# Demo pipeline — mirrors the Chunk Sidecar gates 1:1 so that "sidecar green"
+# reliably means "CI green". Gate order matches .chunk/config.json:
+# install → lint → scan (Trivy + Snyk) → test → bundle, for each mini-app.
 #
-# A fuller iOS pipeline (Snyk, OIDC, Fastlane, TestFlight, App Store)
-# lives on AwesomeCICD/circleci-demo-ios:bcp-demo for reference.
+# The scan steps need SNYK_TOKEN, provided via the AwesomeCICD `snyk` context.
+# Snyk reads SNYK_TOKEN from the environment, so no `snyk auth` step is required.
+#
+# A fuller iOS pipeline (OIDC, Fastlane, TestFlight, App Store) lives on
+# AwesomeCICD/circleci-demo-ios:bcp-demo for reference.
 
 jobs:
   validate-miniapp:
@@ -32,6 +36,24 @@ jobs:
           name: Lint
           command: cd << parameters.miniapp_path >> && npm run lint
       - run:
+          name: Install scanners (Trivy + Snyk)
+          command: |
+            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
+            sudo npm install -g snyk
+      - restore_cache:
+          keys:
+            - v1-trivy-db-
+      - run:
+          name: "Scan: Trivy (HIGH,CRITICAL)"
+          command: cd << parameters.miniapp_path >> && trivy fs --severity HIGH,CRITICAL --exit-code 1 --no-progress .
+      - save_cache:
+          key: v1-trivy-db-{{ epoch }}
+          paths:
+            - ~/.cache/trivy
+      - run:
+          name: "Scan: Snyk (severity high+)"
+          command: cd << parameters.miniapp_path >> && snyk test --severity-threshold=high
+      - run:
           name: Test
           command: cd << parameters.miniapp_path >> && npm test -- --watchAll=false
       - run:
@@ -43,9 +65,11 @@ workflows:
     jobs:
       - validate-miniapp:
           name: "Payments"
+          context: snyk
           miniapp_name: payments
           miniapp_path: miniapps/payments
       - validate-miniapp:
           name: "Transfers"
+          context: snyk
           miniapp_name: transfers
           miniapp_path: miniapps/transfers
