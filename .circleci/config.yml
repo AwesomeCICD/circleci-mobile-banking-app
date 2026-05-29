@@ -4,7 +4,7 @@ version: 2.1
 # reliably means "CI green". Gate order matches .chunk/config.json:
 # install → lint → scan (Trivy + Snyk) → test → bundle, for each mini-app.
 #
-# The scan steps need SNYK_TOKEN, provided via the AwesomeCICD `snyk` context.
+# The scan steps need SNYK_TOKEN, provided via the AwesomeCICD `derry-snyk` context.
 # Snyk reads SNYK_TOKEN from the environment, so no `snyk auth` step is required.
 #
 # A fuller iOS pipeline (OIDC, Fastlane, TestFlight, App Store) lives on
@@ -65,11 +65,11 @@ workflows:
     jobs:
       - validate-miniapp:
           name: "Payments"
-          context: snyk
+          context: derry-snyk
           miniapp_name: payments
           miniapp_path: miniapps/payments
       - validate-miniapp:
           name: "Transfers"
-          context: snyk
+          context: derry-snyk
           miniapp_name: transfers
           miniapp_path: miniapps/transfers
