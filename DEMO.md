@@ -28,7 +28,7 @@ claude                                              # launch Claude Code from in
 
 > **[Face the audience. No commands yet.]**
 
-AI coding agents are fast. Really fast. Claude Code, Cursor, Copilot — they ship code at a pace no developer could match manually.
+AI coding agents are fast. Really fast. Claude Code, Cursor — they ship code at a pace no developer could match manually.
 
 But fast doesn't mean correct.
 
