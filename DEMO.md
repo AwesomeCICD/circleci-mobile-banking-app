@@ -1,5 +1,5 @@
 # Chunk Sidecars — Live Demo Script
-### LeadDev LDX3 London · 4 minutes
+### LeadDev LDX3 London · ~5 minutes
 
 ---
 
@@ -16,6 +16,7 @@ claude                                              # launch Claude Code from in
 
 **Have open before you go on stage:**
 - Editor with `miniapps/payments/src/App.js` visible (left half of screen)
+- A second editor tab with `.chunk/config.json` and `.circleci/config.yml` side by side (for the contract beat)
 - Claude Code terminal (right half of screen)
 - Browser tab pre-loaded to your CircleCI pipeline page
 
@@ -53,7 +54,35 @@ Here's mine. Twelve gates — install, lint, **scan**, test, build — across bo
 
 ---
 
-## WHAT IS A STOP HOOK? (1:00 → 1:30)
+## THE CONTRACT — SIDECAR ≡ CI (1:00 → 2:00)
+
+> **[Switch to the editor tab with `.chunk/config.json` and `.circleci/config.yml` side by side.]**
+
+People hear "runs on a sidecar" and assume it's an approximation — a linter that's *close* to CI's, tests that are *mostly* the same. That gap is exactly where "works on my machine" lives.
+
+So look at this. On the left, `.chunk/config.json` — what the sidecar runs. On the right, `.circleci/config.yml` — what CI runs.
+
+> **[Point to the Snyk gate in each.]**
+
+The sidecar's `scan-payments-snyk` gate:
+
+```
+cd miniapps/payments && snyk test --severity-threshold=high
+```
+
+The CircleCI step, *Scan: Snyk (severity high+)*:
+
+```
+cd miniapps/payments && snyk test --severity-threshold=high
+```
+
+Character for character, the same command. Same for Trivy — `trivy fs --severity HIGH,CRITICAL --exit-code 1` in both. Same install, same lint, same test, same bundle.
+
+This isn't *similar* to CI. It **is** CI's command set, pulled forward to the inner loop. One contract, two places it runs. When the sidecar is green, there's no daylight left for CI to find.
+
+---
+
+## WHAT IS A STOP HOOK? (2:00 → 2:30)
 
 Here's the part that makes this interesting. I'm not going to type `chunk validate` once during this demo.
 
@@ -77,7 +106,7 @@ Validation in the inner loop. Not as an afterthought. As part of the agent's lif
 
 ---
 
-## THE DEMO (1:30 → 3:10)
+## THE DEMO (2:30 → 4:10)
 
 > **[Screen: editor on left showing `miniapps/payments/src/App.js`, Claude Code terminal on right]**
 
@@ -127,7 +156,7 @@ Two fixes. Under a minute. The agent never touched CI. And the scan gates went g
 
 ---
 
-## THE PUSH (3:10 → 4:00)
+## THE PUSH (4:10 → 5:00)
 
 > **[In the terminal, type:]**
 
