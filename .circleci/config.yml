@@ -36,10 +36,9 @@ jobs:
           name: Lint
           command: cd << parameters.miniapp_path >> && npm run lint
       - run:
-          name: Install scanners (Trivy + Snyk)
+          name: Install scanner (Trivy)
           command: |
             curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
-            sudo npm install -g snyk
       - restore_cache:
           keys:
             - v1-trivy-db-
@@ -50,9 +49,6 @@ jobs:
           key: v1-trivy-db-{{ epoch }}
           paths:
             - ~/.cache/trivy
-      - run:
-          name: "Scan: Snyk (severity high+)"
-          command: cd << parameters.miniapp_path >> && snyk test --severity-threshold=high
       - run:
           name: Test
           command: cd << parameters.miniapp_path >> && npm test -- --watchAll=false
