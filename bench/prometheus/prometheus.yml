@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: "claude-code-otel"
+    static_configs:
+      - targets: ["otel-collector:8889"]
+
+  # honor_labels so the loop/trial labels the harness pushes are kept as-is.
+  - job_name: "bench-pushgateway"
+    honor_labels: true
+    static_configs:
+      - targets: ["pushgateway:9091"]

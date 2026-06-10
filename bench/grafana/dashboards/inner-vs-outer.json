@@ -1,0 +1,146 @@
+{
+  "uid": "inner-vs-outer",
+  "title": "Sidecar Benchmark — Inner vs Outer Loop",
+  "tags": ["claude-code", "sidecar", "benchmark"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "editable": true,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "loop",
+        "type": "custom",
+        "query": "inner,outer",
+        "current": { "text": "All", "value": "$__all" },
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Headline — per-trial averages by loop",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "bargauge",
+      "title": "Avg wall-clock to green (s)  ⟵ lower is better",
+      "description": "Harness-measured end-to-end time per trial, including CI waits. Sidecars' strongest expected win.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "palette-classic" } } },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "expr": "avg by (loop) (bench_wall_clock_seconds{loop=~\"$loop\"})", "legendFormat": "{{loop}}" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "bargauge",
+      "title": "Avg cost per trial ($)  ⟵ lower is better",
+      "description": "claude_code cost — captured from the headless result (bench_cost_usd) and cross-checked against the OTEL cost counter.",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "color": { "mode": "palette-classic" } } },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "expr": "avg by (loop) (bench_cost_usd{loop=~\"$loop\"})", "legendFormat": "{{loop}}" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "bargauge",
+      "title": "Avg CI compute per trial (min)  ⟵ lower is better",
+      "description": "Sum of CircleCI job durations across all pipelines a trial triggered. Outer loop pays this on every iteration.",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "m", "color": { "mode": "palette-classic" } } },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "expr": "avg by (loop) (bench_ci_seconds{loop=~\"$loop\"}) / 60", "legendFormat": "{{loop}}" }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Tokens & iterations",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
+    },
+    {
+      "id": 11,
+      "type": "barchart",
+      "title": "Avg tokens per trial by type",
+      "description": "claude_code_token_usage split by input / output / cacheRead / cacheCreation. The honest metric — may or may not favor sidecars.",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "palette-classic" } } },
+      "options": { "orientation": "horizontal", "stacking": "normal", "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "avg by (loop, type) (sum by (loop, trial, type) (claude_code_token_usage_tokens_total{loop=~\"$loop\"}))", "legendFormat": "{{loop}} — {{type}}" }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "bargauge",
+      "title": "Avg iterations per trial (agent turns)",
+      "description": "claude_code num_turns. Outer-loop iterations each cost a full CI cycle; inner-loop iterations cost ~seconds on the sidecar.",
+      "gridPos": { "h": 9, "w": 6, "x": 12, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "palette-classic" } } },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "expr": "avg by (loop) (bench_turns{loop=~\"$loop\"})", "legendFormat": "{{loop}}" }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "bargauge",
+      "title": "Avg CI pipelines per trial",
+      "description": "Pipelines triggered per trial = pushes. Inner loop should approach 1 (validated before push); outer loop = number of fix-and-push cycles.",
+      "gridPos": { "h": 9, "w": 6, "x": 18, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "palette-classic" } } },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        { "expr": "avg by (loop) (bench_ci_pipelines{loop=~\"$loop\"})", "legendFormat": "{{loop}}" }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "Per-trial detail",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 }
+    },
+    {
+      "id": 21,
+      "type": "table",
+      "title": "Per-trial metrics",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+      "options": { "showHeader": true },
+      "targets": [
+        { "refId": "wall", "format": "table", "instant": true, "expr": "bench_wall_clock_seconds{loop=~\"$loop\"}" },
+        { "refId": "cost", "format": "table", "instant": true, "expr": "bench_cost_usd{loop=~\"$loop\"}" },
+        { "refId": "turns", "format": "table", "instant": true, "expr": "bench_turns{loop=~\"$loop\"}" },
+        { "refId": "ci", "format": "table", "instant": true, "expr": "bench_ci_seconds{loop=~\"$loop\"}" },
+        { "refId": "pipes", "format": "table", "instant": true, "expr": "bench_ci_pipelines{loop=~\"$loop\"}" },
+        { "refId": "tokens", "format": "table", "instant": true, "expr": "sum by (loop, trial) (claude_code_token_usage_tokens_total{loop=~\"$loop\"})" }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "job": true, "instance": true, "exported_job": true },
+            "renameByName": {
+              "Value #wall": "wall (s)",
+              "Value #cost": "cost ($)",
+              "Value #turns": "turns",
+              "Value #ci": "CI (s)",
+              "Value #pipes": "pipelines",
+              "Value #tokens": "tokens"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

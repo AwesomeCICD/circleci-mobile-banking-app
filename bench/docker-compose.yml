@@ -1,0 +1,65 @@
+# OTEL stack for the inner-vs-outer-loop benchmark.
+#
+#   Claude Code --(OTLP gRPC :4317)--> otel-collector --(:8889 /metrics)--> prometheus --> grafana
+#
+# Start with:  docker compose -f bench/docker-compose.yml up -d
+# Grafana:     http://localhost:3000   (admin / admin)
+# Prometheus:  http://localhost:9090
+#
+# The collector, prometheus, and grafana stay up for the whole benchmark run so
+# Prometheus accumulates one series per session (labelled loop=inner|outer, trial=N).
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    command: ["--config=/etc/otelcol/collector.yaml"]
+    volumes:
+      - ./otel/collector.yaml:/etc/otelcol/collector.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC  (CLAUDE_CODE points here)
+      - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus scrape endpoint (collector -> prometheus)
+    restart: unless-stopped
+
+  # Harness-measured metrics OTEL can't see: wall-clock (incl. CI waits),
+  # time-to-green, CI minutes, iteration count. run-trial.sh pushes here.
+  pushgateway:
+    image: prom/pushgateway:v1.10.0
+    ports:
+      - "9091:9091"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - otel-collector
+      - pushgateway
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  prom-data:
+  grafana-data:

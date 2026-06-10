@@ -1,0 +1,39 @@
+# OpenTelemetry Collector config for the benchmark.
+# Receives OTLP from Claude Code and re-exposes everything as Prometheus metrics.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+
+exporters:
+  # Prometheus scrape target. resource_to_telemetry_conversion lifts resource
+  # attributes (loop, trial, session.id, ...) onto every metric as labels, which
+  # is what lets the dashboard split inner vs outer.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    send_timestamps: true
+    metric_expiration: 60m
+    resource_to_telemetry_conversion:
+      enabled: true
+    enable_open_metrics: true
+  # Echo to collector logs so we can eyeball exact metric names on first run.
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus, debug]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
