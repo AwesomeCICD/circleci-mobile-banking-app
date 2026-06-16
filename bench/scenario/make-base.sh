@@ -11,6 +11,7 @@
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
+START_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 BASE_REF="${1:-origin/main}"
 
 git fetch -q origin main
@@ -50,3 +51,4 @@ fi
 git add .chunk/config.json .circleci/config.yml
 git commit -q -m "bench: reduced gate set (drop Snyk; keep install/lint/Trivy/test/bundle)"
 echo "bench/base ready at $(git rev-parse --short HEAD) (gates: $(jq -r '[.commands[]|select(.role=="gate").name]|join(", ")' .chunk/config.json))"
+git checkout -q "$START_BRANCH"

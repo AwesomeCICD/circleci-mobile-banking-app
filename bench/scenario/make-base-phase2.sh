@@ -14,6 +14,7 @@
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
+START_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
 git rev-parse --verify -q bench/base >/dev/null || {
   echo "ERROR: bench/base missing — run: bash bench/scenario/make-base.sh" >&2
@@ -58,6 +59,8 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 import App from '../src/App';
 
+const expectedButtonLabel = 'Send money';
+
 test('renders Payments welcome and send button', () => {
   const { getByText } = render(<App />);
   expect(getByText('Welcome to Payments')).toBeTruthy();
@@ -84,6 +87,7 @@ git add \
 git commit -q -m "bench: phase2 layered seed (lint + payments test + transfers test)"
 
 echo "bench/base-phase2 ready at $(git rev-parse --short HEAD)"
-echo "  payments lint:  unused pendingTransfers, draftMemo"
+echo "  payments lint:  unused pendingTransfers, draftMemo (+ unused in test file)"
 echo "  payments test:  expects 'Send Money' (wrong casing)"
 echo "  transfers test: expects subtitle (App.js still title-only)"
+git checkout -q "$START_BRANCH"
