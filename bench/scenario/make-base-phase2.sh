@@ -2,9 +2,13 @@
 #
 # make-base-phase2.sh
 #
-# Builds bench/base-phase2 from bench/base with a seeded WIP on Payments that
-# reliably fails lint on the first validation (TouchableOpacity without import).
-# Transfers stays clean; the task adds the subtitle + test there.
+# Builds bench/base-phase2 from bench/base with layered defects that fail real
+# gates in this repo's ESLint/Jest setup (see verify-phase2-seed.sh).
+#
+# Expected outer-loop sequence (milestone workflow):
+#   Push 1 — Payments milestone: lint fail (unused vars)
+#   Push 2 — Payments clean, Transfers not done: transfers test fail
+#   Push 3 — green (or Push 2 if agent batches Transfers with Payments fixes)
 #
 # Prerequisite: bench/base must exist (run make-base.sh first).
 set -euo pipefail
@@ -19,13 +23,14 @@ git rev-parse --verify -q bench/base >/dev/null || {
 git checkout -q -B bench/base-phase2 bench/base
 git reset -q --hard bench/base
 
-# --- Seeded WIP: lint fail (TouchableOpacity not imported) -------------------
 cat > miniapps/payments/src/App.js <<'JS'
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 const App = () => {
   const handleSend = () => {};
+  const pendingTransfers = 2;
+  const draftMemo = 'update tests after lint';
 
   return (
     <View style={styles.container}>
@@ -48,25 +53,37 @@ const styles = StyleSheet.create({
 export default App;
 JS
 
-# Test still only checks title — agent must extend for the button (second fail
-# if they fix lint but forget the test update).
-# Uncomment the block below after dry-run if outer iterations stay at 1:
-#
-# cat > miniapps/payments/__tests__/App.test.js <<'JS'
-# import React from 'react';
-# import { render } from '@testing-library/react-native';
-# import App from '../src/App';
-#
-# test('renders Payments welcome and send button', () => {
-#   const { getByText } = render(<App />);
-#   expect(getByText('Welcome to Payments')).toBeTruthy();
-#   expect(getByText('Send Money')).toBeTruthy(); // wrong casing — fails until fixed
-# });
-# JS
+cat > miniapps/payments/__tests__/App.test.js <<'JS'
+import React from 'react';
+import { render } from '@testing-library/react-native';
+import App from '../src/App';
 
-git add miniapps/payments/src/App.js
-git commit -q -m "bench: phase2 seeded WIP (lint fail: TouchableOpacity not imported)"
+test('renders Payments welcome and send button', () => {
+  const { getByText } = render(<App />);
+  expect(getByText('Welcome to Payments')).toBeTruthy();
+  expect(getByText('Send Money')).toBeTruthy();
+});
+JS
+
+cat > miniapps/transfers/__tests__/App.test.js <<'JS'
+import React from 'react';
+import { render } from '@testing-library/react-native';
+import App from '../src/App';
+
+test('renders Transfers title and welcome subtitle', () => {
+  const { getByText } = render(<App />);
+  expect(getByText('Transfers')).toBeTruthy();
+  expect(getByText('Welcome back, Alex')).toBeTruthy();
+});
+JS
+
+git add \
+  miniapps/payments/src/App.js \
+  miniapps/payments/__tests__/App.test.js \
+  miniapps/transfers/__tests__/App.test.js
+git commit -q -m "bench: phase2 layered seed (lint + payments test + transfers test)"
 
 echo "bench/base-phase2 ready at $(git rev-parse --short HEAD)"
-echo "  seeded: payments App.js uses TouchableOpacity without import (lint gate fail)"
-echo "  clean:  transfers unchanged — task adds subtitle + test"
+echo "  payments lint:  unused pendingTransfers, draftMemo"
+echo "  payments test:  expects 'Send Money' (wrong casing)"
+echo "  transfers test: expects subtitle (App.js still title-only)"
