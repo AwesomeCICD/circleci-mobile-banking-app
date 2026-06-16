@@ -39,6 +39,15 @@ BRANCH="bench/${LABEL}"
 RESULT_JSON="$RESULTS/${LABEL}.json"
 RUN_LOG="$RESULTS/${LABEL}.log"
 
+# Load harness inputs BEFORE cutting the trial branch. Trial branches are cut
+# from bench/base (origin/main lineage) and do not carry phase-specific scenario
+# files — checkout would delete them from the working tree.
+PROMPT="$(cat "$BENCH_DIR/scenario/preamble-${ARM}${PREAMBLE_SUFFIX}.md"; echo; cat "$BENCH_DIR/scenario/${TASK_FILE}")"
+SETTINGS="$(cat "$BENCH_DIR/env/settings-${ARM}.json")"
+# shellcheck disable=SC1091
+source "$BENCH_DIR/env/shared.env"
+export OTEL_RESOURCE_ATTRIBUTES="loop=${ARM},trial=${TRIAL}"
+
 # cut each trial from the reduced-gate base branch (built by make-base.sh), so
 # both arms validate the same Snyk-free gate set. Override with BENCH_BASE_REF.
 if [[ -z "${BENCH_BASE_REF:-}" ]]; then
@@ -54,14 +63,8 @@ BASE_SHA="$(git rev-parse HEAD)"
 
 # arm-specific Claude settings (working-tree change; fine if the agent commits it
 # on this throwaway branch — CircleCI does not read .claude/).
-cp "$BENCH_DIR/env/settings-${ARM}.json" "$REPO_ROOT/.claude/settings.json"
-
-# telemetry env
-# shellcheck disable=SC1091
-source "$BENCH_DIR/env/shared.env"
-export OTEL_RESOURCE_ATTRIBUTES="loop=${ARM},trial=${TRIAL}"
-
-PROMPT="$(cat "$BENCH_DIR/scenario/preamble-${ARM}${PREAMBLE_SUFFIX}.md"; echo; cat "$BENCH_DIR/scenario/${TASK_FILE}")"
+mkdir -p "$REPO_ROOT/.claude"
+printf '%s\n' "$SETTINGS" > "$REPO_ROOT/.claude/settings.json"
 
 ITERS=1; CI_STATUS="n/a"
 if [[ "$ARM" == "inner" ]]; then
