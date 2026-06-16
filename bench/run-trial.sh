@@ -49,6 +49,14 @@ RUN_LOG="$RESULTS/${LABEL}.log"
 # files — checkout would delete them from the working tree.
 PROMPT="$(cat "$BENCH_DIR/scenario/preamble-${ARM}${PREAMBLE_SUFFIX}.md"; echo; cat "$BENCH_DIR/scenario/${TASK_FILE}")"
 SETTINGS="$(cat "$BENCH_DIR/env/settings-${ARM}.json")"
+# Trial branches are cut from bench/base* and do not carry harness scripts; cache
+# trial-pr.sh before checkout deletes it from the working tree.
+TRIAL_PR=""
+if [[ -f "$BENCH_DIR/trial-pr.sh" ]]; then
+  TRIAL_PR="$RESULTS/.trial-pr.sh"
+  cp "$BENCH_DIR/trial-pr.sh" "$TRIAL_PR"
+  chmod +x "$TRIAL_PR"
+fi
 # shellcheck disable=SC1091
 source "$BENCH_DIR/env/shared.env"
 export OTEL_RESOURCE_ATTRIBUTES="loop=${ARM},trial=${TRIAL}"
@@ -72,7 +80,9 @@ git checkout -q -B "$BRANCH" "$BASE_REF"
 git reset -q --hard "$BASE_REF"          # byte-identical start; discards any leftover swap
 BASE_SHA="$(git rev-parse HEAD)"
 git push -u origin "$BRANCH" --force
-bash "$BENCH_DIR/trial-pr.sh" open "$LABEL" "$ARM" "$TRIAL" "$BENCH_PHASE" "$BASE_SHA" || true
+if [[ -n "$TRIAL_PR" ]]; then
+  bash "$TRIAL_PR" open "$LABEL" "$ARM" "$TRIAL" "$BENCH_PHASE" "$BASE_SHA" || true
+fi
 
 # arm-specific Claude settings (working-tree change; fine if the agent commits it
 # on this throwaway branch — CircleCI does not read .claude/).
@@ -169,8 +179,10 @@ cat > "$RESULTS/${LABEL}.metrics.json" <<EOF
   "cost_usd": ${COST}, "turns": ${TURNS}, "is_error": ${IS_ERROR} }
 EOF
 
-bash "$BENCH_DIR/trial-pr.sh" finalize "$LABEL" "$ARM" "$TRIAL" "$BENCH_PHASE" "$BASE_SHA" "$CI_STATUS" || true
-if [[ -f "$RESULTS/${LABEL}.pr.json" ]]; then
+if [[ -n "$TRIAL_PR" ]]; then
+  bash "$TRIAL_PR" finalize "$LABEL" "$ARM" "$TRIAL" "$BENCH_PHASE" "$BASE_SHA" "$CI_STATUS" || true
+fi
+if [[ -n "$TRIAL_PR" ]] && [[ -f "$RESULTS/${LABEL}.pr.json" ]]; then
   PR_URL="$(jq -r '.url // ""' "$RESULTS/${LABEL}.pr.json" 2>/dev/null || true)"
   if [[ -n "$PR_URL" ]]; then
     jq --arg url "$PR_URL" '. + {pr_url: $url}' "$RESULTS/${LABEL}.metrics.json" > "$RESULTS/${LABEL}.metrics.json.tmp"
