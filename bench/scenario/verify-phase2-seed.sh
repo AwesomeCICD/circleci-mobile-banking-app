@@ -12,7 +12,11 @@ git rev-parse --verify -q bench/base-phase2 >/dev/null || {
 }
 
 START="$(git rev-parse --abbrev-ref HEAD)"
-cleanup() { git checkout -q "$START" 2>/dev/null || true; }
+cleanup() {
+  git checkout -q bench/base-phase2 2>/dev/null || true
+  git reset -q --hard HEAD 2>/dev/null || true
+  git checkout -q "$START" 2>/dev/null || true
+}
 trap cleanup EXIT
 
 git checkout -q bench/base-phase2

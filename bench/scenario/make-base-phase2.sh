@@ -15,6 +15,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 START_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+restore_branch() { git checkout -q "$START_BRANCH" 2>/dev/null || true; }
+trap restore_branch EXIT
 
 git rev-parse --verify -q bench/base >/dev/null || {
   echo "ERROR: bench/base missing — run: bash bench/scenario/make-base.sh" >&2
@@ -90,4 +92,3 @@ echo "bench/base-phase2 ready at $(git rev-parse --short HEAD)"
 echo "  payments lint:  unused pendingTransfers, draftMemo (+ unused in test file)"
 echo "  payments test:  expects 'Send Money' (wrong casing)"
 echo "  transfers test: expects subtitle (App.js still title-only)"
-git checkout -q "$START_BRANCH"
