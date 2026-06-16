@@ -11,6 +11,9 @@
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
+START_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+restore_branch() { git checkout -q "$START_BRANCH" 2>/dev/null || true; }
+trap restore_branch EXIT
 BASE_REF="${1:-origin/main}"
 
 git fetch -q origin main
@@ -39,8 +42,8 @@ while i < len(lines):
 open(p, "w").write("".join(out))
 PY
 
-# sanity: no executable Snyk left (comments / the unused derry-snyk context are fine)
-if grep -qE 'snyk test|install -g snyk' .circleci/config.yml; then
+# sanity: no executable Snyk left (comments are fine)
+if grep -vE '^\s*#' .circleci/config.yml | grep -qE 'snyk test|install -g snyk'; then
   echo "ERROR: snyk still executed in CI config after edit" >&2; exit 1
 fi
 if [ "$(jq '[.commands[]|select(.name|test("snyk"))]|length' .chunk/config.json)" != "0" ]; then

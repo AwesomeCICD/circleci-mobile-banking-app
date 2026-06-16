@@ -9,9 +9,11 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-# Restore only the files the task touches, leaving the bench/ harness intact.
+# Restore files the phase2 task touches (payments + transfers).
 git checkout HEAD -- \
   miniapps/payments/src/App.js \
-  miniapps/payments/__tests__/App.test.js 2>/dev/null || true
+  miniapps/payments/__tests__/App.test.js \
+  miniapps/transfers/src/App.js \
+  miniapps/transfers/__tests__/App.test.js 2>/dev/null || true
 
-echo "Baseline restored: miniapps/payments/{src/App.js,__tests__/App.test.js} @ HEAD"
+echo "Baseline restored: payments + transfers App.js and tests @ HEAD"

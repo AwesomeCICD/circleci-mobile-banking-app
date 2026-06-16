@@ -1,7 +1,7 @@
 # Phase 2: Iteration Economics (Inner vs Outer Loop)
 
-**Branch:** `bench/phase2-iteration-economics`  
-**Status:** Planning — harness scaffolded, not yet run  
+**Branch:** `bench/phase2-outer-dry-run`  
+**Status:** Strong layered seed + milestone workflow — run `verify-phase2-seed.sh` before batch  
 **Predecessor:** Phase 1 (`bench/report.md`) — first-try-pass floor case  
 **Loop Lab sequel:** [The Sidecar Race](https://loop.circleci.com/the-sidecar-race-22-seconds-vs-69-seconds-inside-the-agent-loop) (TTS); Phase 1 draft (loop-overhead tokens)
 
@@ -78,14 +78,17 @@ We are **not** claiming universal 40% savings. We are measuring **iteration econ
 
 See [scenario/TASK-phase2.md](./scenario/TASK-phase2.md).
 
-**Summary:** Complete a partially implemented Payments welcome screen (fix lint + tests), then add a matching personalized subtitle to Transfers with an updated test. Both mini-apps must pass all gates.
+**Summary:** Two-milestone task (Payments, then Transfers) with **layered seeded defects** so the outer arm must push-and-wait multiple times. Inner arm fixes all defects via sidecar before one push.
 
 **Why this task:**
 
-1. **Seeded lint failure** — WIP uses `TouchableOpacity` without importing it → reliable first gate fail.
-2. **Test gap** — WIP adds UI but leaves old test unchanged until agent updates it → second fail if agent fixes lint first without tests.
-3. **Multi-app** — Transfers change ensures both app gate sets run; mirrors real monorepo work.
-4. **Agent-canonical fixes** — failures are ordinary ESLint/Jest errors, not credential or infra issues.
+1. **Payments lint trap** — unused `pendingTransfers` + `draftMemo` (real `no-unused-vars` fail in this repo).
+2. **Payments test trap** — asserts `Send Money` wrong casing after lint is fixed.
+3. **Transfers test ahead of app** — expects subtitle before Milestone 2 edits `App.js`.
+4. **Milestone outer workflow** — no Transfers edits until after Payments push + CI feedback.
+5. **Agent-canonical fixes** — ordinary ESLint/Jest errors, not credentials or infra.
+
+**Verify before trials:** `bash bench/scenario/verify-phase2-seed.sh`
 
 ---
 
@@ -100,21 +103,18 @@ bash bench/scenario/make-base-phase2.sh   # bench/base-phase2 (seeded WIP)
 
 **Payments `App.js` (seeded):**
 
-- Subtitle + `Send money` button present in JSX
-- `handleSend` defined
-- **`TouchableOpacity` used but not imported** → ESLint `react/jsx-no-undef` / no-undef
+- Welcome UI + `Send money` button (`TouchableOpacity` not imported — agent trap, not ESLint fail here)
+- **`pendingTransfers` + `draftMemo` unused** → ESLint `no-unused-vars`
 
 **Payments test (seeded):**
 
-- Still asserts only `Welcome to Payments` — does **not** assert the new button → passes until agent breaks something else, or we optionally seed a **wrong** button assertion
+- Asserts **`Send Money`** (wrong casing) → Jest fail after lint fixed
 
-**Optional second seed (recommended after dry-run):** If agents fix lint + add test in one turn too often, add to test file:
+**Transfers test (seeded):**
 
-```javascript
-expect(getByText('Send Money')).toBeTruthy(); // wrong casing — fails until fixed
-```
+- Asserts **`Welcome back, Alex`** → Jest fail until Milestone 2 updates `App.js`
 
-**Transfers:** Clean baseline (no WIP). Task requires new subtitle + test assertion.
+**Transfers `App.js`:** title only — lint passes, test fails
 
 ---
 
@@ -223,7 +223,8 @@ BENCH_PHASE=2 bash bench/run-bench.sh 5
 |---|---|
 | `PHASE2.md` | This plan |
 | `scenario/TASK-phase2.md` | Agent task prompt |
-| `scenario/make-base-phase2.sh` | Builds `bench/base-phase2` with seeded WIP |
+| `scenario/make-base-phase2.sh` | Builds `bench/base-phase2` with layered seeded defects |
+| `scenario/verify-phase2-seed.sh` | Preflight — confirms expected lint/test failures |
 | `scenario/preamble-inner-phase2.md` | Push-after-green inner workflow |
 | `scenario/preamble-outer-phase2.md` | Outer loop (same as Phase 1 + phase label) |
 | `run-bench.sh` | Honors `BENCH_PHASE=2` |
