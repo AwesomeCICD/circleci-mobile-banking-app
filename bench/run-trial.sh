@@ -27,14 +27,34 @@ PUSHGW="${PUSHGW:-http://localhost:9091}"
 mkdir -p "$RESULTS"
 cd "$REPO_ROOT"
 
+BENCH_PHASE="${BENCH_PHASE:-1}"
+case "$BENCH_PHASE" in
+  1) TASK_FILE="TASK.md"; PREAMBLE_SUFFIX="" ;;
+  2) TASK_FILE="TASK-phase2.md"; PREAMBLE_SUFFIX="-phase2" ;;
+  *) echo "ERROR: BENCH_PHASE must be 1 or 2 (got: $BENCH_PHASE)"; exit 2 ;;
+esac
+
 LABEL="${ARM}-${TRIAL}"
 BRANCH="bench/${LABEL}"
 RESULT_JSON="$RESULTS/${LABEL}.json"
 RUN_LOG="$RESULTS/${LABEL}.log"
 
+# Load harness inputs BEFORE cutting the trial branch. Trial branches are cut
+# from bench/base (origin/main lineage) and do not carry phase-specific scenario
+# files — checkout would delete them from the working tree.
+PROMPT="$(cat "$BENCH_DIR/scenario/preamble-${ARM}${PREAMBLE_SUFFIX}.md"; echo; cat "$BENCH_DIR/scenario/${TASK_FILE}")"
+SETTINGS="$(cat "$BENCH_DIR/env/settings-${ARM}.json")"
+# shellcheck disable=SC1091
+source "$BENCH_DIR/env/shared.env"
+export OTEL_RESOURCE_ATTRIBUTES="loop=${ARM},trial=${TRIAL}"
+
 # cut each trial from the reduced-gate base branch (built by make-base.sh), so
 # both arms validate the same Snyk-free gate set. Override with BENCH_BASE_REF.
-BASE_REF="${BENCH_BASE_REF:-bench/base}"
+if [[ -z "${BENCH_BASE_REF:-}" ]]; then
+  BENCH_BASE_REF="bench/base"
+  [[ "$BENCH_PHASE" == "2" ]] && BENCH_BASE_REF="bench/base-phase2"
+fi
+BASE_REF="$BENCH_BASE_REF"
 git rev-parse --verify -q "$BASE_REF" >/dev/null || { echo "ERROR: $BASE_REF missing — run bench/scenario/make-base.sh"; exit 1; }
 echo "==> [$LABEL] fresh branch $BRANCH from $BASE_REF"
 git checkout -q -B "$BRANCH" "$BASE_REF"
@@ -43,14 +63,8 @@ BASE_SHA="$(git rev-parse HEAD)"
 
 # arm-specific Claude settings (working-tree change; fine if the agent commits it
 # on this throwaway branch — CircleCI does not read .claude/).
-cp "$BENCH_DIR/env/settings-${ARM}.json" "$REPO_ROOT/.claude/settings.json"
-
-# telemetry env
-# shellcheck disable=SC1091
-source "$BENCH_DIR/env/shared.env"
-export OTEL_RESOURCE_ATTRIBUTES="loop=${ARM},trial=${TRIAL}"
-
-PROMPT="$(cat "$BENCH_DIR/scenario/preamble-${ARM}.md"; echo; cat "$BENCH_DIR/scenario/TASK.md")"
+mkdir -p "$REPO_ROOT/.claude"
+printf '%s\n' "$SETTINGS" > "$REPO_ROOT/.claude/settings.json"
 
 ITERS=1; CI_STATUS="n/a"
 if [[ "$ARM" == "inner" ]]; then
@@ -119,7 +133,7 @@ echo "$BRANCH" > "$RESULTS/${LABEL}.branch"
 
 # local metrics sidecar so aggregate.mjs can build the report from raw files
 cat > "$RESULTS/${LABEL}.metrics.json" <<EOF
-{ "arm": "${ARM}", "trial": ${TRIAL}, "branch": "${BRANCH}",
+{ "arm": "${ARM}", "trial": ${TRIAL}, "branch": "${BRANCH}", "phase": ${BENCH_PHASE},
   "wall_seconds": ${WALL}, "claude_rc": ${CLAUDE_RC}, "commits": ${COMMITS},
   "iterations": ${ITERS}, "ci_status": "${CI_STATUS}",
   "cost_usd": ${COST}, "turns": ${TURNS}, "is_error": ${IS_ERROR} }
