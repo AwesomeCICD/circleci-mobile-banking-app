@@ -99,9 +99,20 @@ git checkout -q -B "$BRANCH" "$BASE_REF"
 git reset -q --hard "$BASE_REF"          # byte-identical start; discards any leftover swap
 BASE_SHA="$(git rev-parse HEAD)"
 git push -u origin "$BRANCH" --force
-if [[ -n "$TRIAL_PR" ]]; then
+
+# Draft PR opens after the first commit (GitHub needs a diff; reopen may fail on stale closed PRs).
+maybe_open_trial_pr() {
+  [[ -n "$TRIAL_PR" ]] || return 0
+  [[ "${BENCH_OPEN_PR:-1}" == "1" ]] || return 0
+  local commits_now url
+  commits_now="$(git rev-list --count "${BASE_SHA}..HEAD" 2>/dev/null || echo 0)"
+  [[ "$commits_now" -ge 1 ]] || return 0
+  if [[ -f "$RESULTS/${LABEL}.pr.json" ]]; then
+    url="$(jq -r '.url // empty' "$RESULTS/${LABEL}.pr.json" 2>/dev/null || true)"
+    [[ -n "$url" ]] && return 0
+  fi
   bash "$TRIAL_PR" open "$LABEL" "$ARM" "$TRIAL" "$BENCH_PHASE" "$BASE_SHA" || true
-fi
+}
 
 # arm-specific Claude settings (working-tree change; fine if the agent commits it
 # on this throwaway branch — CircleCI does not read .claude/).
@@ -140,6 +151,7 @@ if [[ "$ARM" == "inner" ]]; then
       FEEDBACK="$COMMIT_FEEDBACK"
       continue
     fi
+    maybe_open_trial_pr
 
     VAL_LOG="$RESULTS/${LABEL}.validate${ITERS}.log"
     echo "==> [$LABEL] sidecar validate (iteration $ITERS) ..."
@@ -230,6 +242,7 @@ else
       FEEDBACK="$COMMIT_FEEDBACK"
       continue
     fi
+    maybe_open_trial_pr
     if [[ "$(unpushed_count)" -ge 1 ]]; then
       echo "==> [$LABEL] $(unpushed_count) commit(s) not pushed — push required before CI"
       FEEDBACK="$PUSH_FEEDBACK"

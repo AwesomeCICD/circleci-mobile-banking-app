@@ -131,9 +131,14 @@ ensure_pr_open() {
   local state
   state="$(gh pr view "$num" --repo "$repo" --json state -q .state 2>/dev/null || echo "")"
   if [[ "$state" == "CLOSED" ]]; then
-    gh pr reopen "$num" --repo "$repo" 2>/dev/null \
-      && echo "==> [$LABEL] reopened closed PR #$num"
+    if gh pr reopen "$num" --repo "$repo" 2>/dev/null; then
+      echo "==> [$LABEL] reopened closed PR #$num"
+      return 0
+    fi
+    echo "==> [$LABEL] could not reopen closed PR #$num (will open a new draft PR)" >&2
+    return 1
   fi
+  return 0
 }
 
 case "$ACTION" in
@@ -143,17 +148,22 @@ case "$ACTION" in
     REPO="$(gh_repo)" || { echo "WARN: could not resolve GitHub repo"; exit 0; }
 
     NUM="$(existing_pr_number "$REPO")"
+    URL=""
     if [[ -n "$NUM" ]]; then
-      ensure_pr_open "$REPO" "$NUM"
+      ensure_pr_open "$REPO" "$NUM" || true
       URL="$(gh pr view "$NUM" --repo "$REPO" --json url -q .url)"
       echo "==> [$LABEL] draft PR already open: $URL"
-    elif NUM="$(existing_closed_pr_number "$REPO")" && [[ -n "$NUM" ]]; then
-      ensure_pr_open "$REPO" "$NUM"
-      gh pr edit "$NUM" --repo "$REPO" --title "$(pr_title)" --body "$(pr_body_initial)" 2>/dev/null || true
-      URL="$(gh pr view "$NUM" --repo "$REPO" --json url -q .url)"
-      echo "==> [$LABEL] reopened draft PR #$NUM: $URL"
     else
-      URL=""
+      CLOSED="$(existing_closed_pr_number "$REPO")"
+      if [[ -n "$CLOSED" ]] && ensure_pr_open "$REPO" "$CLOSED"; then
+        NUM="$CLOSED"
+        gh pr edit "$NUM" --repo "$REPO" --title "$(pr_title)" --body "$(pr_body_initial)" 2>/dev/null || true
+        URL="$(gh pr view "$NUM" --repo "$REPO" --json url -q .url)"
+        echo "==> [$LABEL] reopened draft PR #$NUM: $URL"
+      fi
+    fi
+
+    if [[ -z "$URL" ]]; then
       err=""
       for attempt in 1 2 3 4 5; do
         if out="$(gh pr create --repo "$REPO" --base "$PR_BASE" --head "$BRANCH" --draft \

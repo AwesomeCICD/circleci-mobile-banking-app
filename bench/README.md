@@ -41,8 +41,8 @@ For the outer arm, the scripts own the CI wait (push → block until the real
 pipeline finishes → feed the result back via `--resume` → repeat), so the
 outer-loop clock honestly includes the minutes a developer waits on CI.
 
-Each trial also opens a **draft GitHub PR** on its throwaway branch (`bench/<arm>-<trial>`)
-as a durable artifact (commit history, CI checks, run summary in the PR body).
+Each trial opens a **draft GitHub PR** on its throwaway branch (`bench/<arm>-<trial>`)
+after the first commit (experiment artifact: commit history, CI checks, run summary in the PR body).
 When the trial finishes with green CI, the PR is marked ready for review.
 Set `BENCH_OPEN_PR=0` to disable. Override the repo with `BENCH_GH_REPO=owner/repo`
 if `gh` resolves the wrong remote.
