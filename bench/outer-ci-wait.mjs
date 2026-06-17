@@ -60,20 +60,34 @@ async function failureFeedback(workflows) {
 (async () => {
   const deadline = maxWaitSec;
   let waited = 0;
+  let sawPipeline = false;
   try {
     while (waited <= deadline) {
       const p = await findPipeline();
       if (p) {
+        sawPipeline = true;
         const wfs = (await get(`${API}/pipeline/${p.id}/workflow`)).items || [];
         const pending = wfs.filter((w) => ["running", "on_hold", "not_run"].includes(w.status) || w.status == null);
         if (wfs.length && pending.length === 0) {
-          const failed = wfs.some((w) => ["failed", "error", "failing"].includes(w.status));
+          const failed = wfs.some((w) => ["failed", "error", "failing", "canceled"].includes(w.status));
           if (!failed) { out({ status: "success", pipelineNumber: p.number }); return; }
           out({ status: "failed", pipelineNumber: p.number, feedback: await failureFeedback(wfs) }); return;
         }
+      } else if (REVISION && waited >= 90) {
+        out({
+          status: "error",
+          feedback: `No CircleCI pipeline found for revision ${REVISION.slice(0, 12)} after ${waited}s. ` +
+            "The commit may not have been pushed to origin yet.",
+        });
+        return;
       }
       await sleep(8); waited += 8;
     }
-    out({ status: "timeout", feedback: `CI did not finish within ${maxWaitSec}s` });
+    out({
+      status: "timeout",
+      feedback: sawPipeline
+        ? `CI did not finish within ${maxWaitSec}s`
+        : `No CircleCI pipeline found for revision ${(REVISION || "").slice(0, 12)} within ${maxWaitSec}s`,
+    });
   } catch (e) { out({ status: "error", feedback: e.message }); }
 })();

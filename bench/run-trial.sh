@@ -147,9 +147,23 @@ $(tail -120 "$VAL_LOG")"
       FEEDBACK="Sidecar validation passed on your working tree. Commit all changes now (git add + git commit), then stop. Do not push until committed."
       continue
     fi
-    if [[ "$AHEAD" -lt 1 ]]; then
-      echo "==> [$LABEL] sidecar green; no push yet"
-      FEEDBACK="Sidecar validation passed and your changes are committed. Run git push now, then stop."
+    if [[ "$AHEAD" -ge 1 ]]; then
+      echo "==> [$LABEL] sidecar green; ${AHEAD} commit(s) not pushed yet"
+      FEEDBACK="Sidecar validation passed and your changes are committed locally (${AHEAD} commit(s) ahead of origin). Run git push now, then stop."
+      continue
+    fi
+
+    COMMITS_LOCAL="$(git rev-list --count "${BASE_SHA}..HEAD" 2>/dev/null || echo 0)"
+    if [[ "$COMMITS_LOCAL" -lt 1 ]]; then
+      echo "==> [$LABEL] sidecar green; no commits yet"
+      FEEDBACK="Sidecar validation passed but there are no commits yet. git add, git commit, git push, then stop."
+      continue
+    fi
+
+    REMOTE_HEAD="$(git rev-parse '@{u}' 2>/dev/null || echo "")"
+    if [[ -n "$REMOTE_HEAD" && "$(git rev-parse HEAD)" != "$REMOTE_HEAD" ]]; then
+      echo "==> [$LABEL] sidecar green; local HEAD != origin (push required)"
+      FEEDBACK="Sidecar validation passed but origin does not have your latest commit. Run git push, then stop."
       continue
     fi
 
@@ -160,9 +174,15 @@ $(tail -120 "$VAL_LOG")"
     if [ "$CI_STATUS" = "success" ]; then
       break
     fi
-    FEEDBACK="Your push triggered CI but the pipeline FAILED. Fix the failures, commit, and push again, then stop.
+    if [ "$CI_STATUS" = "failed" ]; then
+      FEEDBACK="Your push triggered CI but the pipeline FAILED. Fix the failures, commit, and push again, then stop.
 
 $(echo "$CIW" | jq -r '.feedback // "no logs"' 2>/dev/null)"
+    else
+      FEEDBACK="CI wait ended with status ${CI_STATUS}. Ensure git push succeeded, then stop again.
+
+$(echo "$CIW" | jq -r '.feedback // "no logs"' 2>/dev/null)"
+    fi
   done
   END=$(date +%s); WALL=$((END - START))
   [ "$CI_STATUS" = "success" ] && IS_ERROR=false || IS_ERROR=true
