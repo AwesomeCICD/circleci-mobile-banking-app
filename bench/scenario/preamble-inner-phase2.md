@@ -15,7 +15,10 @@ Workflow (Phase 2 — push only when sidecar is green):
   4. You are done when you have pushed and the sidecar reported no failures on
      your final working tree.
 
-Do NOT push broken code to GitHub. Use the sidecar for fast feedback; push only
-after validation passes on both mini-apps.
+Do NOT end your session until both milestones are complete, the sidecar is green
+on the full repo, and you have committed and pushed once. Do NOT run validation
+commands yourself — the Stop hook handles that automatically.
+
+Do NOT push broken code to GitHub.
 
 Your task:

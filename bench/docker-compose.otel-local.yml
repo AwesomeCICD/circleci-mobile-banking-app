@@ -1,0 +1,17 @@
+# Local override for macOS Docker Desktop when ~/Desktop bind mounts fail.
+# Used by bench/start-otel.sh (copies configs to /tmp first).
+services:
+  otel-collector:
+    volumes:
+      - ${BENCH_OTEL_ROOT}/otel/collector.yaml:/etc/otelcol/collector.yaml:ro
+
+  prometheus:
+    volumes:
+      - ${BENCH_OTEL_ROOT}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom-data:/prometheus
+
+  grafana:
+    volumes:
+      - ${BENCH_OTEL_ROOT}/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ${BENCH_OTEL_ROOT}/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana

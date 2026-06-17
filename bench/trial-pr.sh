@@ -19,7 +19,12 @@ PHASE="${5:?}"
 BASE_SHA="${6:-}"
 CI_STATUS="${7:-unknown}"
 
-BENCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "$(basename "$SCRIPT_DIR")" == "results" ]]; then
+  BENCH_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+else
+  BENCH_DIR="$SCRIPT_DIR"
+fi
 REPO_ROOT="$(cd "$BENCH_DIR/.." && pwd)"
 RESULTS="$BENCH_DIR/results"
 BRANCH="bench/${LABEL}"

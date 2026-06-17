@@ -57,6 +57,15 @@ if [[ -f "$BENCH_DIR/trial-pr.sh" ]]; then
   cp "$BENCH_DIR/trial-pr.sh" "$TRIAL_PR"
   chmod +x "$TRIAL_PR"
 fi
+VALIDATE_PTY=""
+if [[ -f "$BENCH_DIR/chunk-validate-pty.sh" ]]; then
+  VALIDATE_PTY="$RESULTS/.chunk-validate-pty.sh"
+  cp "$BENCH_DIR/chunk-validate-pty.sh" "$VALIDATE_PTY"
+  chmod +x "$VALIDATE_PTY"
+fi
+if [[ "$ARM" == "inner" && -n "$VALIDATE_PTY" ]]; then
+  SETTINGS="$(printf '%s' "$SETTINGS" | jq --arg cmd "bash $VALIDATE_PTY" '.hooks.Stop[0].hooks[0].command = $cmd')"
+fi
 # shellcheck disable=SC1091
 source "$BENCH_DIR/env/shared.env"
 export OTEL_RESOURCE_ATTRIBUTES="loop=${ARM},trial=${TRIAL}"
