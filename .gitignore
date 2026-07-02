@@ -62,3 +62,10 @@ vendor/
 # Node / React Native
 node_modules/
 miniapps/*/dist/
+
+# CircleCI Smarter Testing (generated)
+**/test-reports/
+**/coverage-analysis/
+**/impact-doctor-*.json
+# Mutable chunk validate gate-state (machine-specific; impact maps ARE committed)
+.circleci/state.json

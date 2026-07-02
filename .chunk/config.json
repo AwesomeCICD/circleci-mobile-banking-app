@@ -60,7 +60,7 @@
     },
     {
       "name": "test-payments",
-      "run": "cd miniapps/payments && npm test -- --watchAll=false",
+      "run": "cd miniapps/payments && circleci run testsuite \"ci tests\" --local",
       "role": "gate",
       "remote": true,
       "timeout": 120,
@@ -68,7 +68,7 @@
     },
     {
       "name": "test-transfers",
-      "run": "cd miniapps/transfers && npm test -- --watchAll=false",
+      "run": "cd miniapps/transfers && circleci run testsuite \"ci tests\" --local",
       "role": "gate",
       "remote": true,
       "timeout": 120,

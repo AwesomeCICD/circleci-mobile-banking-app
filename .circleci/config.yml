@@ -54,8 +54,11 @@ jobs:
           name: "Scan: Snyk (severity high+)"
           command: cd << parameters.miniapp_path >> && snyk test --severity-threshold=high
       - run:
-          name: Test
-          command: cd << parameters.miniapp_path >> && npm test -- --watchAll=false
+          name: Test (CircleCI Smarter Testing — impact analysis + auto-rerun)
+          command: cd << parameters.miniapp_path >> && circleci run testsuite "ci tests"
+      - store_test_results:
+          # Must match the directory of `outputs.junit` in test-suites.yml.
+          path: << parameters.miniapp_path >>/test-reports
       - run:
           name: Bundle iOS
           command: cd << parameters.miniapp_path >> && mkdir -p dist/ios/assets && npm run bundle:ios

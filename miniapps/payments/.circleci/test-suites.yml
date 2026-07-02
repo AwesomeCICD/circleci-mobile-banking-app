@@ -1,0 +1,21 @@
+---
+# CircleCI Smarter Testing — payments mini-app.
+# Run from this subpackage root: `circleci run testsuite "ci tests"`.
+# Jest has built-in coverage support, so Test Impact Analysis needs no
+# separate file-mapper: coverage data maps source files -> impacted tests.
+name: ci tests
+discover: npx jest --listTests
+run: JEST_JUNIT_OUTPUT_FILE="<< outputs.junit >>" npx jest << test.atoms >>
+# Coverage-instrumented pass used to build the source-file -> test map.
+# LCOV mode analyses one atom at a time; jest writes lcov.info into the
+# coverage directory, which we expose as outputs.lcov.
+analysis: npx jest --coverage --coverageReporters=lcovonly --coverageDirectory=coverage-analysis --runInBand --silent << test.atoms >> && cp coverage-analysis/lcov.info "<< outputs.lcov >>"
+outputs:
+  junit: test-reports/junit.xml
+options:
+  # Unique per mini-app so impact data does not collide under one project.
+  impact-key: payments
+  # Run only the tests a change actually affects.
+  test-impact-analysis: true
+  # Auto-retry flaky failures up to 3 times before failing the gate.
+  max-auto-rerun: 3
