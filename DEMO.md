@@ -1,223 +1,310 @@
-# Chunk Sidecars — Live Demo Script
-### LeadDev LDX3 London · ~6 minutes
+# DEMO.md — circleci-mobile-banking-app (Mobile)
+
+| | |
+|---|---|
+| **Catalog use case** | 1 · Mobile (iOS) |
+| **Owner** | Derry Bradley |
+| **Repos** | **This repo:** React Native mini-apps, native iOS shell source, Chunk sidecar gates, Smarter Testing, benchmark. **[circleci-demo-ios @ `bcp-demo`](https://github.com/AwesomeCICD/circleci-demo-ios/tree/bcp-demo):** the full outer loop (macOS build, Fastlane, TestFlight, approval, App Store) |
+| **Formats** | A. Cold opener (5 min) · B. Mobile pipeline (15 min) · C. Inner loop with sidecars (6 min, the LDX3 script) · D. The numbers (3 min) · Full session A→C→B→D (~30 min) |
+| **Status** | DRAFT. **The latest `main` pipeline here (#38, 11 Aug 2026) is red.** `bcp-demo` was last green on 27 Apr 2026. See section 0 and section 11. |
 
 ---
 
-## PRE-FLIGHT (run backstage before the talk)
+## The story
+
+> **"Mobile CI is the most expensive, slowest CI you run. macOS minutes cost more and queue longer, and AI agents are about to send you far more changes. CircleCI catches bad changes in the inner loop, in seconds, so only good ones reach the Mac. When they do, one pipeline takes them from code to the App Store."**
+
+**The app:** a brownfield mobile banking app. Feature teams own **React Native mini-apps** (Payments, Transfers), which are assembled into a **native UIKit iOS shell**. When it launches, the shell reads `bundle_manifest.json` and shows which mini-app builds it contains: build number, branch and bundle sizes. That's commit-to-device traceability you can see on screen.
+
+**Three acts:**
+1. **Inner loop (this repo).** An agent writes code, a sidecar runs CI's exact gates on every turn, and Smarter Testing runs only the affected tests. Problems are fixed before the push.
+2. **Outer loop (`bcp-demo`).** Cheap Linux jobs bundle the mini-apps in parallel. The macOS M4 Pro jobs validate the app, assemble the shell, run tests on a simulator, sign with `match` and ship to TestFlight. A human approves, and the build goes to the App Store.
+3. **Proof (`bench/`).** An OpenTelemetry-measured A/B: with the sidecar, an agent reached green 1.6× faster, 1.4× cheaper and with 1.8× fewer tokens.
+
+---
+
+## 0. Pre-flight
+
+### Outer loop (`bcp-demo`), the day before
+
+- [ ] **Pipeline is green.** The last `bcp-mobile-pipeline` run on `bcp-demo` should be green and recent. Trigger one the day before and leave it waiting at `approve-release`, so you can approve it live.
+- [ ] **Credentials still work.** Check the App Store Connect API key, the `match` SSH key and the AWS OIDC role (`AWS_ROLE_ARN`). The first two expire or rotate, and they're the usual cause of failures.
+- [ ] **The app is on a device or simulator** showing the manifest screen ("LOADED MINI-APP MODULES").
+
+### Inner loop (this repo), 30 minutes before
 
 ```bash
-cd ~/projects/mobile/circleci-mobile-banking-app    # the demo repo
-git status                                          # confirm clean main
-chunk sidecar current                               # confirm sidecar is up
-chunk validate                                      # warm it (green in ~13s)
-./scripts/seed-broken.sh                            # apply the broken-agent state
-claude                                              # launch Claude Code from inside the repo (so the Stop hook activates)
+cd ~/projects/mobile/circleci-mobile-banking-app
+git status                    # clean main; DON'T demo with a modified .chunk/config.json (see section 11)
+chunk sidecar current         # sidecar is up
+chunk validate                # warm it (green in ~13–30s)
+./scripts/seed-broken.sh      # apply the broken-agent state
+claude                        # launch Claude Code from inside the repo so the Stop hook activates
 ```
 
-**Have open before you go on stage:**
-- Editor with `miniapps/payments/src/App.js` visible (left half of screen)
-- A second editor tab with `.chunk/config.json` and `.circleci/config.yml` side by side (for the contract beat)
-- Claude Code terminal (right half of screen)
-- Browser tab pre-loaded to your CircleCI pipeline page
+> ⚠️ Don't run `chunk validate` again after seeding. The first failure needs to happen live.
 
-> ⚠️ Do not run `chunk validate` again after seeding — the first failure needs to happen live.
-
----
-
-## INTRO (0:00 → 0:30)
-
-> **[Face the audience. No commands yet.]**
->
-> Intro to yourself
-> Intro to SOSDR
-
-AI coding agents are fast. Really fast. Claude Code, Cursor — they ship code at a pace no developer could match manually.
-
-But fast doesn't mean correct.
-
-A lot of the time the problem isn't that agents write bad code, even though we all know sometimes they do. A massive problem is that by the time CI tells you something is broken — the agent has moved on. The context is gone. You're debugging a change from the agent you've already forgotten.
-
-What if validation happened *before* the commit? Before the push. Before CI even sees it.
-
-That's what Chunk Sidecars do. And I'm going to show you exactly how it works.
+**Have these open:**
+- **Editor (left):** `miniapps/payments/src/App.js`
+- **Second editor tab:** `.chunk/config.json` beside `.circleci/config.yml`, for the contract beat
+- **Terminal (right):** Claude Code
+- **Browser:** this repo's pipeline page, the `bcp-demo` pipeline graph, and `bench/report.md`
 
 ---
 
-## WHAT IS THE INNER LOOP? (0:30 → 1:15)
+## 1. What's where
 
-> **[Image on screen: the two-loop diagram — Inner Loop (Plan → Code → Validate → Debug) on the left, Outer Loop (Build → Test → Deploy → Release) on the right, joined by "Change" and "Feedback" arrows.]**
+### This repo
 
-Quick bit of framing. Every change lives in two loops.
+| Path | What it is |
+|---|---|
+| `miniapps/payments`, `miniapps/transfers` | React Native 0.73 mini-apps with Jest tests, ESLint, and `bundle:ios` / `bundle:android` scripts |
+| `Game/`, `Game.xcodeproj`, `fastlane/` | The native iOS shell, which reads `bundle_manifest.json` |
+| `.chunk/config.json` | 12 sidecar gates: install, lint, Trivy and Snyk scans, test, bundle |
+| `.claude/settings.json` | Generated by `chunk init`. A **Stop** hook runs `chunk validate`; a **PreToolUse** hook on `git commit` runs `npm ci && npm run bundle:ios` |
+| `.circleci/config.yml` | A pipeline that runs the same gates in the same order, one job per mini-app on `cimg/node` |
+| `miniapps/*/.circleci/test-suites.yml` | **Smarter Testing**: test impact analysis based on Jest coverage, with `max-auto-rerun: 3` |
+| `.circleci/impact-*.json` | The impact map (source file → tests). Without it, every test runs |
+| `bench/` | OTEL A/B benchmark, `report.md`, Grafana dashboard, and its own `DEMO.md` |
 
-The **inner loop** — on the left — is where you actually work: plan, code, validate, debug, on your machine, in seconds. The **outer loop** — on the right — is what happens after you push: build, test, deploy, release, in CI, in minutes.
+**What CI here does not do:** it doesn't build the native shell on macOS. That happens on `bcp-demo`.
 
-For years those were balanced. Then AI showed up and made the inner loop incredibly fast — but because we rely on CI to validate so much, things arent always correct. So incomplete changes sail through the inner loop and pile up in the outer loop, where every failure costs a full CI cycle and a context switch.
+### `circleci-demo-ios @ bcp-demo`: the full mobile pipeline
 
-> **[Point to the "Validate" node on the inner-loop side.]**
-
-The fix isn't a faster outer loop. It's putting real validation back *here* — on the Validate step, inside the inner loop — so a change is correct before it ever becomes CI's problem.
-
-That's the gap sidecars close.
+```
+Stage 1 — Linux (cimg/node, medium)
+  Build RN Mini-App: Payments ─┐
+  Build RN Mini-App: Transfers ┴→ upload-artifacts (S3 via OIDC)
+Stage 2 — macOS (m4pro.medium, Xcode 16.x)
+  → validate            fastlane validate_app: icons, Info.plist, auth, bundle ID
+  → build-native-shell  unpack bundles, generate bundle_manifest.json, fastlane scan on simulator
+  → security-scans      Snyk (+ SonarQube, simulated)
+  → deploy-testflight   match → gym → pilot (App Store Connect API key) + app-distribution + Slack
+  → approve-release     (approval)
+  → submit-app-store    (simulated)
+```
 
 ---
 
-## WHAT IS A SIDECAR? (1:15 → 1:45)
+## 2. Track A: cold opener (5 min)
 
-> **[Optional: switch to terminal, run `chunk sidecar current` and `chunk validate --list`]**
+| Show | Say |
+|---|---|
+| **The app on a device or simulator: the manifest screen** | "This is a banking app built the way most big mobile teams build now: a native shell, with feature teams shipping React Native mini-apps into it. This screen shows the build number, branch and which mini-app builds are inside. Every install traces back to a pipeline." |
+| **The `bcp-demo` workflow graph** | "Here's how it gets built. The JavaScript bundles on cheap Linux machines in parallel. Only the native part uses Apple silicon. Then validation, simulator tests, signing and TestFlight, and a human approves the App Store release. It's one pipeline from commit to store." |
+| **This repo: Claude Code catching a lint error in 7 seconds** (Track C, short version) | "And before any of that, while an AI agent is still writing code, we run CI's own checks against every change in seconds. The expensive Mac pipeline only ever sees changes that already pass." |
 
-A sidecar is a remote sandbox — running on CircleCI — that mirrors your CI environment exactly. Same install commands. Same lint rules. Same test suite.
-
-> **[Point to the list of gates if visible]**
-
-Here's mine. Twelve gates — install, lint, **scan**, test, build — across both mini-apps. Trivy and Snyk run alongside the unit tests, so a transitive CVE blocks the agent the same way a failing test does. Same commands my CircleCI pipeline runs. The difference is *when* they run.
+**Discovery question:** "How long does a mobile change take to get to TestFlight today, and how much of that is waiting on Mac capacity or fixing broken builds?"
 
 ---
 
-## THE CONTRACT — SIDECAR ≡ CI (1:45 → 2:45)
+## 3. Track B: the mobile pipeline (`bcp-demo`, ~15 min)
 
-> **[Switch to the editor tab with `.chunk/config.json` and `.circleci/config.yml` side by side.]**
+**Audience:** mobile leads, mobile platform teams and release managers.
 
-People hear "runs on a sidecar" and assume it's an approximation — a linter that's *close* to CI's, tests that are *mostly* the same. That gap is exactly where "works on my machine" lives.
+1. **Split the work by cost** (3 min). Show the two `Build RN Mini-App` jobs.
+   - "JavaScript doesn't need a Mac. We bundle each mini-app in parallel on Linux, package it and pass it downstream through a workspace. Mac minutes go only to what needs Xcode."
+   - Show `upload-artifacts`: "Artifacts are archived to S3 using OIDC, with no AWS keys stored in CircleCI."
+2. **Apple silicon at the right size** (2 min). Show `macos: xcode: "16.4.0"` and `resource_class: m4pro.medium`.
+   - "We pin the Xcode version per job and run on M4 Pro. You choose the Xcode image, so upgrades happen when you choose to do them."
+3. **Catch App Store rejections in CI** (3 min). Show the `validate` job and the `validate_app` lane.
+   - "Before we spend time building, we check what Apple would reject: icon sizes and alpha channels, required `Info.plist` keys, the bundle ID and signing credentials. That's a rejection caught in minutes instead of days."
+4. **Assemble, trace, test** (3 min). Show `build-native-shell`.
+   - "We unpack the mini-app bundles into the shell and write a manifest of exactly what went in. That manifest is what the app showed earlier."
+   - Then `fastlane scan` runs on the simulator, and test results appear in the **Tests** tab.
+5. **Sign and ship** (3 min). Show `deploy-testflight`.
+   - "`match` pulls certificates from a private repo, `gym` builds the IPA, and `pilot` uploads to TestFlight with an App Store Connect API key, so there are no 2FA prompts in CI."
+   - "Slack tells the team, and the app-distribution orb sends it to testers."
+6. **A human in the loop** (1 min). Show `approve-release` → `submit-app-store`.
+   - "The App Store release needs an approval click. It's recorded with who approved it and when."
 
-So look at this. On the left, `.chunk/config.json` — what the sidecar runs. On the right, `.circleci/config.yml` — what CI runs.
+**Discovery questions:**
+- "How do you manage signing certificates across the team today?"
+- "How often does a build get rejected at App Store review?"
+- "Are you on Intel or Apple silicon in CI?"
 
-> **[Point to the Snyk gate in each.]**
+---
 
-The sidecar's `scan-payments-snyk` gate:
+## 4. Track C: the inner loop with Chunk Sidecars (~6 min)
+
+*The rehearsed LDX3 London script, unchanged apart from minor edits.*
+
+### Intro (0:00 → 0:30)
+
+> **[Face the audience. No commands yet.]** Introduce yourself.
+
+"AI coding agents are fast. Claude Code and Cursor ship code at a pace no developer could match by hand. But fast doesn't mean correct. The problem isn't only that agents sometimes write bad code. By the time CI tells you something is broken, the agent has moved on and the context is gone. What if validation happened *before* the commit, before CI even saw it? That's what Chunk Sidecars do."
+
+### The inner loop (0:30 → 1:15)
+
+> **[Show the two-loop diagram: Inner Loop (Plan → Code → Validate → Debug) and Outer Loop (Build → Test → Deploy → Release).]**
+
+"The **inner loop** is where you work, in seconds. The **outer loop** is CI, in minutes. AI made the inner loop incredibly fast, but we still rely on CI to validate, so incomplete changes pile up in the outer loop. Every failure there costs a full CI cycle."
+
+> **[Point to "Validate".]**
+
+"The fix isn't a faster outer loop. It's putting real validation back *here*."
+
+**Mobile bridge line:** "And on mobile, that outer loop runs on macOS, the most expensive minutes you buy."
+
+### What is a sidecar? (1:15 → 1:45)
+
+> **[Optional: `chunk sidecar current`, `chunk validate --list`]**
+
+"A sidecar is a remote sandbox running on CircleCI that mirrors your CI environment exactly. Here are my twelve gates: install, lint, **scan**, test and bundle, across both mini-apps. Trivy and Snyk run alongside the unit tests, so a vulnerable transitive dependency blocks the agent the same way a failing test does."
+
+### The contract: sidecar ≡ CI (1:45 → 2:45)
+
+> **[`.chunk/config.json` and `.circleci/config.yml` side by side. Point to the Snyk gate in each.]**
+
+"People hear 'runs on a sidecar' and assume it's an approximation. That gap is where 'works on my machine' lives. Look at the sidecar's `scan-payments-snyk` gate:"
 
 ```
 cd miniapps/payments && snyk test --severity-threshold=high
 ```
 
-The CircleCI step, *Scan: Snyk (severity high+)*:
+"The CircleCI step is the same command, character for character. Same for Trivy, and the same install, lint, test and bundle steps. This isn't *similar* to CI. It **is** CI's command set, moved into the inner loop."
 
-```
-cd miniapps/payments && snyk test --severity-threshold=high
-```
+**Smarter Testing beat (optional, 20 seconds):** "The test gate runs `circleci run testsuite` with test impact analysis. It runs only the tests your change affects, and retries flaky ones up to three times. That's the same Smarter Testing CI uses."
 
-Character for character, the same command. Same for Trivy — `trivy fs --severity HIGH,CRITICAL --exit-code 1` in both. Same install, same lint, same test, same bundle.
+### The Stop hook (2:45 → 3:15)
 
-This isn't *similar* to CI. It **is** CI's command set, pulled forward to the inner loop.
-
----
-
-Run validate locally
-
-## WHAT IS A STOP HOOK? (2:45 → 3:15)
-
-Here's the part that makes this interesting. I'm not going to type `chunk validate` once during this demo.
-
-Claude Code has a feature called a **Stop hook** — a shell command that fires automatically every time the agent finishes a turn. You configure it once, in `.claude/settings.json`. When you run `chunk init` in your repo, it generates that file for you.
-
-It looks like this:
+"I won't type `chunk validate` once in this demo. Claude Code has a **Stop hook** that fires every time the agent finishes a turn. `chunk init` generates it:"
 
 ```json
-"hooks": {
-  "Stop": [
-    { "hooks": [{ "type": "command", "command": "chunk validate" }] }
-  ]
-}
+"hooks": { "Stop": [ { "hooks": [{ "type": "command", "command": "chunk validate" }] } ] }
 ```
 
-That's it. Every time Claude finishes a reply — the sidecar runs. If something fails, that failure is injected back into the conversation. Claude sees it. Claude fixes it. Before anything is pushed.
+"Every time Claude finishes a reply, the sidecar runs. If something fails, the failure goes back into the conversation and Claude fixes it before anything is pushed."
 
-> **[Pause. Let that land.]**
+### The demo (3:15 → 4:55)
 
-Validation in the inner loop. Not as an afterthought. As part of the agent's lifecycle.
+> **[Editor on the left with `App.js`, Claude Code on the right.]**
 
----
+"I asked Claude to make the Payments screen feel more welcoming. It added a welcome line and started importing `TouchableOpacity`, but never finished. To a human skimming the diff, it looks shippable."
 
-## THE DEMO (3:15 → 4:55)
+Type: `Quick sanity check on the Payments changes before I push?`
 
-> **[Screen: editor on left showing `miniapps/payments/src/App.js`, Claude Code terminal on right]**
-
-Here's the scenario. I asked Claude to make the Payments screen feel more welcoming. It added a welcome line and started importing `TouchableOpacity` for some interactivity it never finished.
-
-To a human skimming the diff — this looks shippable. Let's see what the sidecar thinks.
-
-> **[Switch to Claude Code terminal. Type:]**
-
-```
-Quick sanity check on the Payments changes before I push?
-```
-
-> **[Claude replies. Stop hook fires automatically. ~7 seconds later:]**
-
+About 7 seconds later:
 ```
 ✗ lint-payments
   'TouchableOpacity' is defined but never used  no-unused-vars
 ```
 
-Seven seconds. Dead import. Same lint rule CI would have caught — just minutes earlier, and zero pipeline spend.
+"Seven seconds. A dead import, caught by the same lint rule CI would have used, minutes earlier, with no pipeline spend."
 
-> **[Type:]**
+Type: `go ahead`. Claude removes the import, the hook runs again, and all 12 gates go green.
 
-```
-go ahead
-```
-
-> **[Claude removes the unused import. Stop hook fires again and runs the full gate set — install, lint, scan, test, bundle across both mini-apps — and comes back all 12 green.]**
-
-One fix. The agent never touched CI. And the scan gates went green alongside lint and tests — vulnerability checking happens in the same loop, not as a separate PR check that runs hours later.
-
----
-
-## THE PUSH (4:55 → 5:45)
-
-> **[In the terminal, type:]**
+### The push (4:55 → 5:45)
 
 ```bash
-git add miniapps/payments/
-git commit -m "feat(payments): add welcome message"
-git push
+git add miniapps/payments/ && git commit -m "feat(payments): add welcome message" && git push
 ```
 
-> **[Switch to the CircleCI pipeline tab in the browser. Pipeline runs. Goes green.]**
+> **[Switch to the CircleCI pipeline tab. It goes green.]**
 
-When the sidecar agrees — CI agrees.
-
-First push. First pass. No pipeline failures. No re-runs. No context switching.
-
-> **[Face the audience.]**
-
-That's what validation in the inner loop looks like. Not faster machines. Not more parallelism. Just the right answer, at the right moment — before it costs you anything.
-
-That's Chunk Sidecars.
+"When the sidecar agrees, CI agrees. First push, first pass. And on mobile, that means the Mac pipeline only ever builds changes that already pass."
 
 ---
 
-## ANTICIPATED QUESTIONS
+## 5. Track D: the numbers (~3 min)
+
+The full script is in [`bench/DEMO.md`](./bench/DEMO.md) and the data is in [`bench/report.md`](./bench/report.md). It compares two Claude Code agents on the same task, 5 trials each, instrumented with OpenTelemetry. The only difference is how each one validates.
+
+| Metric | Inner (sidecar) | Outer (CI) | Outer ÷ Inner |
+|---|--:|--:|:--:|
+| Wall-clock to green | 76 s | 123 s | **1.62× slower** |
+| Cost per change | $0.155 | $0.216 | **1.39× more** |
+| Total tokens | 93.6K | 170.2K | **1.82× more** |
+| CI compute | 2.4 min | 2.5 min | ≈ equal |
+
+"This is the outer loop's *best case*: a task that passed CI on the first try. CI minutes are equal only because nobody had to iterate. Every real iteration adds another full CI cycle, and on mobile that's another macOS run."
+
+**Be upfront about the caveats** (from `bench/DEMO.md`):
+- 5 trials on one simple task.
+- One noisy inner trial; the figures are medians.
+- **Snyk was dropped from both arms because of a dead credential.**
+
+---
+
+## 6. Full session running order (~30 min)
+
+A (opener) → C (inner loop) → B (mobile pipeline) → D (numbers) → Q&A.
+
+The bridge from C to B: "So that's what gets *in*. Now let's follow that change all the way to the App Store."
+
+---
+
+## 7. Anticipated questions
 
 **"How does it know to run after every turn?"**
-One command — `chunk init` — wires it up. It generates `.claude/settings.json` with the Stop hook pointing at `chunk validate`. You don't write the file by hand.
+`chunk init` generates `.claude/settings.json` with the Stop hook. You don't write it by hand.
 
 **"What if the sidecar and CI disagree?"**
-They run the same commands. `.chunk/config.json` and `.circleci/config.yml` are the same gates. We treat them as one contract.
+They run the same commands. `.chunk/config.json` and `.circleci/config.yml` are one contract, so keep them in lockstep.
 
 **"Doesn't this slow every Claude turn down?"**
-By about 20–30 seconds on turns that change code, on a warm sidecar (scans add a few seconds; the vuln DBs are pre-cached on the sidecar snapshot). That's CI's job — including security scanning — done in seconds instead of minutes, once per turn rather than once per PR.
+By about 20–30 seconds on turns that change code, on a warm sidecar. That's CI's job done in seconds, once per turn instead of once per PR.
 
 **"Why two scanners?"**
-Trivy and Snyk catch overlapping but not identical CVEs — Trivy reads the package-lock and matches against the Aqua advisory DB; Snyk does graph-aware analysis with its own DB. Running both is cheap on a warm sidecar (~5–10s combined) and the union of findings is broader than either alone.
+Trivy and Snyk catch overlapping but different CVEs. On a warm sidecar, running both adds about 5–10 seconds.
+
+**"Can the sidecar build iOS?"**
+It bundles the React Native JavaScript for iOS, which catches Metro errors, but it doesn't run Xcode. The native build stays in the macOS stage of the outer loop.
+
+**"Android?"**
+The mini-apps have a `bundle:android` script, but neither pipeline builds Android today. Be honest: this is an iOS demo (see section 10).
+
+**"How long does the full mobile pipeline take?"**
+Look at the per-job durations in your rehearsal run. The 27 April run shows 135 minutes overall, but that includes time waiting at the approval step, so don't quote it.
 
 ---
 
-## IF SOMETHING GOES WRONG
+## 8. If something goes wrong
 
 | What happened | Do this |
 |---|---|
-| `chunk validate` hangs past 30s | Run `chunk sidecar current` in another pane. If healthy, retry. Otherwise fall back: `cd miniapps/payments && npm run lint && npm test` |
-| Stop hook didn't fire | You launched Claude Code from outside the repo. Quit, `cd` into the repo, run `claude` again |
-| Claude fixed the import before validating | Re-seed (`./scripts/seed-broken.sh`) and restart — the agent should *report* the sidecar's finding, not pre-fix it |
-| CI takes longer than 2 minutes | Have a screenshot of a previous green run ready. *"In a previous run, you can see…"* |
+| `chunk validate` hangs past 30s | Run `chunk sidecar current` in another pane. If it's healthy, retry. Otherwise: `cd miniapps/payments && npm run lint && npm test` |
+| Stop hook didn't fire | You launched Claude Code from outside the repo. Quit, `cd` in, and run `claude` again |
+| Claude fixed the import before validating | Re-seed (`./scripts/seed-broken.sh`) and restart |
+| CI goes red on Snyk | The Snyk credential is dead (see section 11). Show the sidecar run and a screenshot of a previous green CI run |
+| CI takes longer than 2 minutes | Show a screenshot of a previous green run |
+| `bcp-demo` fails at `match` or TestFlight | Signing or API key expired. Walk the last green run, and use the pre-staged run waiting at `approve-release` |
 
 ---
 
-## RESET BETWEEN RUNS
+## 9. Reset between runs
 
 ```bash
 ./scripts/reset-clean.sh
 git reset --hard origin/main
 ```
 
-Then re-run pre-flight from the top.
+Then run the pre-flight again from the top.
+
+---
+
+## 10. Don't say
+
+- **"iOS, Android and macOS."** The catalog row says this, but it's **iOS only** here. Android is bundling scripts only, and macOS apps aren't covered. `macos-test-app` and `circleci-mobile-performance-demo` aren't part of this story.
+- **"SonarQube quality gate passed."** The SonarQube step in `bcp-demo` is an `echo`. So is `submit-app-store`. Call them "where your quality gate and store submission plug in."
+- **"Snyk blocks the release"** on `bcp-demo`. It runs with `fail-on-issues: false`. The blocking scans are the ones in this repo's sidecar and CI.
+- **"The CI here builds the iOS app."** It doesn't. It validates and bundles the mini-apps; the native build is on `bcp-demo`.
+- **The customer name.** `bcp-demo` uses the name of a real customer: the Snyk project `bcp-mobile-miniapps`, the app name "BCP Mobile Banking" and the branch itself. Don't show those to other prospects; see fix item 4.
+
+---
+
+## 11. Fix before calling this catalog-ready
+
+1. **`main` is red.** Pipeline #38 failed after about 1 minute on 11 Aug 2026. The most likely cause is the dead Snyk credential that `bench/DEMO.md` mentions. Fix the token in the context, then re-run.
+2. **The sidecar and CI contract has drifted locally.** The working copy of `.chunk/config.json` removes both Snyk gates, but CI still runs them. That breaks the "same command, character for character" beat. Restore the gates once Snyk is fixed, or remove the Snyk steps from both files.
+3. **Use a shared context.** CI uses the personal `derry-snyk` context, while the README says `snyk`. Move to a shared FE context so other FEs can run the demo.
+4. **Rename the customer-specific parts of `bcp-demo`.** Rename the branch (for example to `mobile-full-pipeline`), the Snyk project and the app name, so it can be shown to any prospect.
+5. **Choose where the macOS stage lives.** Either add the `bcp-demo` macOS stage to this repo, so one repo tells the whole story, or keep the pointer and keep `bcp-demo` green. The README links `bcp-demo` as a reference only.
+6. **Fix the stale sidecar environment.** The `environment` block in `.chunk/config.json` says `stack: ruby` with `bundle exec rspec`, which is wrong for this repo.
+7. **Tidy `bcp-demo`.**
+   - Xcode is pinned to 16.3 in some jobs and 16.4 in others.
+   - The 25-line Ruby and Bundler setup is copied into five jobs; turn it into a reusable command, which is also a good config-hygiene talking point.
+   - It regenerates `Gemfile.lock` on every run.
+8. **Fix the catalog link.** Row 1's CircleCI link points at a `circle-banking-app` pipeline. Point it at this project.
+9. **Decide on Android.** Either add an Android lane (Gradle on `cimg/android` with emulator tests) or change the catalog row to "Mobile (iOS)".
