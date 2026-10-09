@@ -1,5 +1,5 @@
 import { formatUSD } from './currency';
-import { cardFeeCents, totalWithFee } from './fees';
+import { cardFeeCents, totalWithFee } from './Fees';
 import { luhnValid, maskCard } from './card';
 
 // Assembles a payment from a raw amount + card number, applying the
