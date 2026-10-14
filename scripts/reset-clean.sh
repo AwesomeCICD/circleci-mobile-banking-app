@@ -10,8 +10,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-git checkout HEAD -- miniapps/payments/src/App.js miniapps/payments/__tests__/App.test.js
+git checkout HEAD -- miniapps/payments/src/App.js miniapps/payments/__tests__/App.test.js miniapps/payments/src/lib/payment.js
 
-echo "Reset miniapps/payments/{src/App.js,__tests__/App.test.js} to HEAD."
+echo "Reset miniapps/payments/{src/App.js,__tests__/App.test.js,src/lib/payment.js} to HEAD."
 echo ""
 echo "Run 'chunk validate' to confirm green baseline before next demo run."
