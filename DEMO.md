@@ -165,7 +165,7 @@ cd miniapps/payments && trivy fs --severity HIGH,CRITICAL --exit-code 1 --no-pro
 
 "The CircleCI step is the same command, character for character. The same goes for the install, lint, test and bundle steps. This isn't *similar* to CI. It **is** CI's command set, moved into the inner loop."
 
-**Smarter Testing beat (optional, 20 seconds):** "The test gate runs `circleci run testsuite` with test impact analysis. It runs only the tests your change affects, and retries flaky ones up to three times. That's the same Smarter Testing CI uses."
+**Smarter Testing beat (optional, 20 seconds):** "The test gate runs the Smarter Testing test suite with test impact analysis. It runs only the tests your change affects, and retries flaky ones up to three times. That's the same Smarter Testing CI uses."
 
 ### The Stop hook (2:45 → 3:15)
 

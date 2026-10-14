@@ -47,7 +47,7 @@ jobs:
             - ~/.cache/trivy
       - run:
           name: Test (CircleCI Smarter Testing — impact analysis + auto-rerun)
-          command: cd << parameters.miniapp_path >> && circleci run testsuite "ci tests"
+          command: cd << parameters.miniapp_path >> && circleci testsuite run "ci tests"
       - store_test_results:
           # Must match the directory of `outputs.junit` in test-suites.yml.
           path: << parameters.miniapp_path >>/test-reports

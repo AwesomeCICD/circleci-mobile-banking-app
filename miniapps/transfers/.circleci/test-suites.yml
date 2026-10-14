@@ -1,6 +1,7 @@
 ---
 # CircleCI Smarter Testing — transfers mini-app.
-# Run from this subpackage root: `circleci run testsuite "ci tests"`.
+# Run from this subpackage root: `circleci testsuite run "ci tests"` (CI, CLI 1.x).
+# The sidecar snapshot still has CLI 0.1.x: `circleci run testsuite "ci tests" --local`.
 # Jest has built-in coverage support, so Test Impact Analysis needs no
 # separate file-mapper: coverage data maps source files -> impacted tests.
 name: ci tests
