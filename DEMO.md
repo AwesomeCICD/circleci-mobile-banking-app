@@ -6,7 +6,7 @@
 | **Owner** | Derry Bradley |
 | **Repos** | **This repo:** React Native mini-apps, native iOS shell source, Chunk sidecar gates, Smarter Testing, benchmark. **[circleci-demo-ios @ `bcp-demo`](https://github.com/AwesomeCICD/circleci-demo-ios/tree/bcp-demo):** the full outer loop (macOS build, Fastlane, TestFlight, approval, App Store) |
 | **Formats** | A. Cold opener (5 min) · B. Mobile pipeline (15 min) · C. Inner loop with sidecars (6 min, the LDX3 script) · D. The numbers (3 min) · Full session A→C→B→D (~30 min) |
-| **Status** | DRAFT. **The latest `main` pipeline here (#38, 11 Aug 2026) is red.** `bcp-demo` was last green on 27 Apr 2026. See section 0 and section 11. |
+| **Status** | DRAFT. `main` is green (pipeline #47, 14 Oct 2026). `demo/case-bug-baseline` (#48) is the red reference run for the sidecar video: Payments fails on `./Fees`, 64 s from push to red. `bcp-demo` was last green on 27 Apr 2026. See section 11. |
 
 ---
 
