@@ -15,7 +15,9 @@ jobs:
       miniapp_path:
         type: string
     docker:
-      - image: cimg/node:20.18
+      # Exact tag from the org's approved_language_images policy
+      # (AwesomeCICD/circleci-policies). Other tags are rejected.
+      - image: cimg/node:22.23.4
     resource_class: medium
     steps:
       - checkout
